@@ -32,9 +32,9 @@
      (partial from-bytes ~klass)))
 
 (comment
-  (def-from from-bytes-string nil String)
+  (def-from bytes->string nil String)
 
-  (-> (from-bytes-string (.getBytes "hi") nil)
+  (-> (bytes->string (.getBytes "hi") nil)
       (.substring 0 2)) ;; no reflection!
   )
 

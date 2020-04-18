@@ -39,15 +39,45 @@ One could argue that `java.lang.String` deserves extra attention, as it can repr
 
 ### bites.core/to-bytes \[x ?opts\]
 Turns any of the aforementioned classes to a byte-array. A mere wrapper around `bites.convert/toBytes`.
-`opts` are optional and not even needed most of the times (see list above). 
+`opts` are optional and not even needed most of the times (see list above). For example:
+
+```clj
+(let [uid (UUID/randomUUID)] 
+  (= (to-bytes uid nil)
+     ;; the bytes of a UUID object match with the bytes
+     ;; of the String representation of that object
+     (to-bytes (str uid) {:encoding :uuid}))) ;; => true
+```
+
 
 ### bites.core/from-bytes \[klass bs ?opts\]
 The opposite of `to-bytes`. Returns an instance of `klass` given bytes `bs` and `opts`. 
-A mere wrapper around `bites.convert/fromBytes`.
+A mere wrapper around `bites.convert/fromBytes`, and as such may require type-hinting at the call site.
 `java.io.InputStream`, `java.io.File`, `java.net.URL` and `java.net.URI` don't participate in this. 
 Moreover,`java.io.Serializable` is hardly useful as `klass` in this context. It will do the right thing,
 but you need to know the concrete type in order to do anything useful with the result, 
 and if you know the actual type, then you're better off providing custom to/from impls for it. 
+
+```clj
+(let [uid (to-bytes (UUID/randomUUID) nil)] 
+  (= (str (from-bytes uid nil))
+     ;; the bytes of a UUID object match with the bytes
+     ;; of the String representation of that object
+     (from-bytes String uid {:encoding :uuid}))) ;; => true
+```
+
+### bites.core/def-from \[name doc-string klass\]
+Defines a type-hinted version of `from-bytes` (according to `klass`), taking one or two args (as opposed to three).
+For example:
+
+```clj
+(def-from bytes->string nil String)
+
+(-> (bytes->string (.getBytes "hi") nil)
+    ;; no reflection 
+    (.substring 0 2)) ;; => "hi"
+```
+
 
 ## License
 

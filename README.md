@@ -71,9 +71,10 @@ Defines a type-hinted version of `from-bytes` (according to `klass`), taking one
 For example:
 
 ```clj
-(def-from bytes->string nil String)
+(def-from bytes->string nil String) ;; define it
 
-(-> (bytes->string (.getBytes "hi") nil)
+(-> (.getBytes "hi")
+    (bytes->string  nil) ;; use it
     ;; no reflection 
     (.substring 0 2)) ;; => "hi"
 ```

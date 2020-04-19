@@ -27,12 +27,13 @@ The focus is on the following objects (followed by an optional map), but there a
 - `java.lang.Double`
 - `java.math.BigInteger`
 - `java.math.BigDecimal`
-- `java.lang.String` -  {:encoding  (or String? Charset? #{:b2 :b16 :b64 :uuid}) :b64-flavor #{:mime :url}}
+- `java.lang.String` -  {:encoding  (or string? charset? #{:b2 :b8 :b16 :b64 :uuid}) :b64-flavor #{:mime :url}}
 - `java.util.UUID`
 - `java.io.InputStream` -  {:buffer-size pos-int?} (defaults to 1024)
 - `java.io.File`  -  {:buffer-size pos-int?} 
 - `java.net.URL`  -  {:buffer-size pos-int?}
 - `java.net.URI`  -  {:buffer-size pos-int?}
+- `java.awt.image.BufferedImage` - {:buffer-size pos-int? :image-type string?}
 - `java.io.Serializable`
 
 One could argue that `java.lang.String` deserves extra attention, as it can represent various encodings (e.g. unicode, baseN, uuid etc).
@@ -79,6 +80,14 @@ For example:
     (.substring 0 2)) ;; => "hi"
 ```
 
+## Limitations
+`to-bytes` returns a **single** byte-array. This means that the usual limitations of the JVM 
+with respect to array sizes apply here too. More specifically, array-indexing using 
+32-bit integers means that ~2GB is the maximum possible size (i.e. don't expect to be able
+to read something larger than that into a single byte-array).
+
+See [rapio](https://github.com/jimpil/rapio) 
+for reading **local** resources larger than 2GB into a sequence of byte-arrays.     
 
 ## License
 

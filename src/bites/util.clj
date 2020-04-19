@@ -1,6 +1,16 @@
 (ns bites.util
   (:require [clojure.string :as str])
-  (:import (java.util Base64)))
+  (:import  [java.util Base64]))
+
+(defn octal-bytes
+  ^bytes [^String s]
+  (let [bi (BigInteger. s 8)]
+    (.toByteArray bi)))
+
+(defn octal-str
+  ^String [^bytes bs]
+  (let [bi (BigInteger. bs)]
+    (.toString bi 8)))
 
 (defn b64-str
   "Encodes the provided byte-array <bs> in Base64.
@@ -55,10 +65,11 @@
       bs
 
       (> proper-len bs-len)
-      (let [padding (- proper-len bs-len)]
-        (-> (repeat padding (byte 0))
-            (concat bs)
-            byte-array))
+      (let [padding (- proper-len bs-len)
+            ret (byte-array (+ padding bs-len)
+                            (repeat padding (byte 0)))]
+        (System/arraycopy bs 0 ret padding bs-len)
+        ret)
 
       :else
       (byte-array (next bs)))))

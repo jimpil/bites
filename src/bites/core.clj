@@ -36,6 +36,15 @@
 
   (-> (bytes->string (.getBytes "hi") nil)
       (.substring 0 2)) ;; no reflection!
+
+
+  ;; image->b64-str
+  (-> (ImageIO/read (io/file "...")) ;; the image in question
+      (to-bytes {:image-type "png"})
+      (bytes->string {:encoding :b64}))
+  ;; => a (potentially large) String encoding the image bytes (in Base64)
+
+
   )
 
 

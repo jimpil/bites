@@ -4,19 +4,29 @@
   (:import (java.nio.charset Charset)
            (java.util UUID)
            (java.nio ByteBuffer)
-           (java.io InputStream ByteArrayOutputStream ByteArrayInputStream File Serializable ObjectOutputStream ObjectInputStream FileInputStream)
-           (java.net URL URI)))
+           (java.io InputStream
+                    ByteArrayOutputStream
+                    ByteArrayInputStream
+                    File
+                    Serializable
+                    ObjectOutputStream
+                    ObjectInputStream)
+           (java.net URL URI)
+           (java.awt.image BufferedImage)
+           (javax.imageio ImageIO)
+           (java.nio.file Files)))
 ;;==============<ABSTRACTIONS>================
 (defprotocol ToBytes (toBytes ^bytes [x opts]))
 (defmulti fromBytes (fn [klass x opts] klass))
 ;;==============<PRIVATE HELPERS>================
 (defn- base-encoded
   [^String s enc b64-flavor]
-  (if (.isEmpty s)
+  (if (empty? s)
     (byte-array 0)
     (case enc
     :uuid (-> (UUID/fromString s) (toBytes s))
     :b2  (ut/binary-bytes s)
+    :b8  (ut/octal-bytes s)
     :b64 (ut/b64-bytes s b64-flavor)
     :b16 (ut/b16-bytes s)
     nil)))
@@ -28,6 +38,7 @@
     (case enc
     :uuid (str (fromBytes UUID bs nil))
     :b2  (ut/binary-str bs)
+    :b8  (ut/octal-str bs)
     :b64 (ut/b64-str bs b64-flavor)
     :b16 (ut/b16-str bs)
     nil)))
@@ -75,6 +86,11 @@
       String  (String. bs ^String enc)
       (base-decoded bs enc (:b64-flavor opts)))
     (String. bs)))
+
+(defmethod fromBytes BufferedImage
+  [_ ^bytes bs _]
+  (let [in (ByteArrayInputStream. bs)]
+    (ImageIO/read in)))
 
 (defmethod fromBytes Serializable
   [_ ^bytes bs _]
@@ -137,15 +153,14 @@
   (toBytes [this opts]
     (let [buffer (:buffer-size opts 1024)
           out (ByteArrayOutputStream. buffer)]
-      ;; does NOT .close() this
+      ;; does NOT .close() `this`
       (io/copy this out :buffer-size buffer)
       (.toByteArray out)))
 
   File
   (toBytes [this opts]
-    (with-open [in (FileInputStream. this)]
-      ;; delegates to `InputStream` impl
-      (toBytes in opts)))
+    ;; could delegate to `InputStream` impl
+    (Files/readAllBytes (.toPath this)))
 
   URL
   (toBytes [this opts]
@@ -157,6 +172,14 @@
   (toBytes [this opts]
     ;; delegates to `URL` impl
     (-> this .toURL (toBytes opts)))
+
+  BufferedImage
+  (toBytes [this opts]
+    (let [buffer (:buffer-size opts 1024)
+          ^String img-type (:image-type opts "png")
+          out (ByteArrayOutputStream. buffer)]
+      (ImageIO/write this img-type out)
+      (.toByteArray out)))
 
   Serializable
   (toBytes [this opts]

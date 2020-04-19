@@ -4,12 +4,15 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :refer [defspec]]
-            [bites.convert :as convert])
+            [bites.convert :as convert]
+            [bites.util :as ut])
   (:import (java.nio.charset StandardCharsets)
            (java.util UUID)
            (org.apache.commons.codec.binary Hex BinaryCodec)))
 
 (defn- round-trip*
+  "Helper that does the actual round-tripping
+   and checks that classes match - returns nil if they don't."
   [obj opts]
   (let [obj-class (class obj)
         obj-bytes (convert/toBytes obj opts)
@@ -68,15 +71,19 @@
     (= v (round-trip* v {:encoding "UTF-8"}))))
 
 (defspec round-tripping-gen-hex-string default-runs
-  (prop/for-all [v (gen/fmap
-                     ;; use external lib during testing
+  (prop/for-all [v (gen/fmap ;; use external lib during testing
                      #(Hex/encodeHexString ^bytes %)
                      gen/bytes)]
     (= v (round-trip* v {:encoding :b16}))))
 
-(defspec round-tripping-gen-binary-string default-runs
+(defspec round-tripping-gen-octal-string default-runs
   (prop/for-all [v (gen/fmap
-                     ;; use external lib during testing
+                     #(if (empty? %) "" (ut/octal-str %))
+                     gen/bytes)]
+    (= v (round-trip* v {:encoding :b8}))))
+
+(defspec round-tripping-gen-binary-string default-runs
+  (prop/for-all [v (gen/fmap ;; use external lib during testing
                      #(String. (BinaryCodec/toAsciiBytes ^bytes %))
                      gen/bytes)]
     (= v (round-trip* v {:encoding :b2}))))

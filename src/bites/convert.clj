@@ -98,6 +98,10 @@
   (let [in (ByteArrayInputStream. bs)]
     (ImageIO/read in)))
 
+(defmethod fromBytes ByteBuffer
+  [_ ^bytes bs _]
+  (ByteBuffer/wrap bs))
+
 (defmethod fromBytes Serializable
   [_ ^bytes bs _]
   (let [in (ByteArrayInputStream. bs)]
@@ -186,6 +190,12 @@
           out (ByteArrayOutputStream. buffer)]
       (ImageIO/write this img-type out)
       (.toByteArray out)))
+
+  ByteBuffer
+  (toBytes [this opts]
+    (if (.hasArray this)
+      (.array this)
+      (byte-array 0)))
 
   Serializable
   (toBytes [this opts]

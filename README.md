@@ -54,7 +54,7 @@ Turns any of the aforementioned classes to a byte-array. A mere wrapper around `
 ### bites.core/from-bytes \[klass bs ?opts\]
 The opposite of `to-bytes`. Returns an instance of `klass` given bytes `bs` and `opts`. 
 A mere wrapper around `bites.convert/fromBytes`, and as such may require type-hinting at the call site.
-`java.io.InputStream`, `java.io.File`, `java.net.URL` and `java.net.URI` don't participate in this. 
+`java.io.File`, `java.net.URL` and `java.net.URI` don't participate in this. 
 Moreover,`java.io.Serializable` is hardly useful as `klass` in this context. It will do the right thing,
 but you need to know the concrete type in order to do anything useful with the result, 
 and if you know the actual type, then you're better off providing custom to/from impls for it. 

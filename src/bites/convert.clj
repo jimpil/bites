@@ -15,9 +15,15 @@
            (java.awt.image BufferedImage)
            (javax.imageio ImageIO)
            (java.nio.file Files)))
+
+;;===============<CONSTANTS>=================
+(def ^:const DEFAULT_BUFFER_SIZE (int 1024))
+(def ^:const EMPTY_STRING "")
+
 ;;==============<ABSTRACTIONS>================
 (defprotocol ToBytes (toBytes ^bytes [x opts]))
 (defmulti fromBytes (fn [klass x opts] klass))
+
 ;;==============<PRIVATE HELPERS>================
 (defn- base-encoded
   [^String s enc b64-flavor]
@@ -34,7 +40,7 @@
 (defn- base-decoded
   ^String [^bytes bs enc b64-flavor]
   (if (empty? bs)
-    ""
+    EMPTY_STRING
     (case enc
     :uuid (str (fromBytes UUID bs nil))
     :b2  (ut/binary-str bs)
@@ -151,7 +157,7 @@
 
   InputStream
   (toBytes [this opts]
-    (let [buffer (:buffer-size opts 1024)
+    (let [buffer (:buffer-size opts DEFAULT_BUFFER_SIZE)
           out (ByteArrayOutputStream. buffer)]
       ;; does NOT .close() `this`
       (io/copy this out :buffer-size buffer)
@@ -175,7 +181,7 @@
 
   BufferedImage
   (toBytes [this opts]
-    (let [buffer (:buffer-size opts 1024)
+    (let [buffer (:buffer-size opts DEFAULT_BUFFER_SIZE)
           ^String img-type (:image-type opts "png")
           out (ByteArrayOutputStream. buffer)]
       (ImageIO/write this img-type out)
@@ -183,7 +189,7 @@
 
   Serializable
   (toBytes [this opts]
-    (let [buffer (:buffer-size opts 1024)
+    (let [buffer (:buffer-size opts DEFAULT_BUFFER_SIZE)
           out (ByteArrayOutputStream. buffer)]
       (with-open [oout (ObjectOutputStream. out)]
         (.writeObject oout this)

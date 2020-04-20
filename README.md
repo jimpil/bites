@@ -4,7 +4,7 @@
 
 A no-brainer Clojure library for easily turning (certain) things into bytes (and back), 
 which you can wrap your head around in less than 15 minutes. 
-Emphasis is on correctness rather than speed (i.e. byte arrays/buffers are NEVER reused). 
+Emphasis is on correctness rather than speed (i.e. byte arrays/buffers are not reused). 
 Generative testing through [test.check](https://github.com/clojure/test.check), 
 and where appropriate against [commons-codec](http://commons.apache.org/proper/commons-codec/).
 
@@ -88,6 +88,9 @@ to read something larger than that into a single byte-array).
 
 See [rapio](https://github.com/jimpil/rapio) 
 for reading **local** resources larger than 2GB into a sequence of byte-arrays.     
+
+## Requirements
+- Java 9+
 
 ## License
 

@@ -1,5 +1,5 @@
 (ns bites.core
-  (:require [bites.convert :as convert]))
+  (:require [bites.array :as ba]))
 
 ;(set! *warn-on-reflection* true)
 
@@ -10,7 +10,7 @@
   (^bytes [x]
    (to-bytes x nil))
   (^bytes [x opts]
-   (convert/toBytes x opts)))
+   (ba/toBytes x opts)))
 
 (defn from-bytes
   "Wrapper around `fromBytes` multi-method.
@@ -19,7 +19,7 @@
   ([klass x]
    (from-bytes klass x nil))
   ([klass x opts]
-   (convert/fromBytes klass x opts)))
+   (ba/fromBytes klass x opts)))
 
 (defmacro def-from
   "Defines a type-hinted (per <klass>) function named <sym> taking 1 or 2 args,
@@ -43,11 +43,7 @@
       (to-bytes {:image-type "png"})
       (bytes->string {:encoding :b64}))
   ;; => a (potentially large) String encoding the image bytes (in Base64)
+  ;; ready to be used inside a <img> html tag
 
 
   )
-
-
-
-
-

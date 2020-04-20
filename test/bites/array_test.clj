@@ -1,22 +1,23 @@
-(ns bites.convert-test
+(ns bites.array-test
   (:require [clojure.test :refer :all]
             [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :refer [defspec]]
-            [bites.convert :as convert]
+            [bites.array :as ba]
             [bites.util :as ut])
   (:import (java.nio.charset StandardCharsets)
-           (java.util UUID)
-           (org.apache.commons.codec.binary Hex BinaryCodec)))
+           (java.util UUID Arrays)
+           (org.apache.commons.codec.binary Hex BinaryCodec)
+           (java.nio.channels ReadableByteChannel)))
 
 (defn- round-trip*
   "Helper that does the actual round-tripping
    and checks that classes match - returns nil if they don't."
   [obj opts]
   (let [obj-class (class obj)
-        obj-bytes (convert/toBytes obj opts)
-        round-tripped (convert/fromBytes obj-class obj-bytes opts)
+        obj-bytes (ba/toBytes obj opts)
+        round-tripped (ba/fromBytes obj-class obj-bytes opts)
         round-tripped-class (class round-tripped)]
     (if (= obj-class round-tripped-class)
       round-tripped
@@ -37,6 +38,7 @@
    "00010101"                           {:encoding :b2}  ;; 1 byte
    (str (UUID/randomUUID))              {:encoding :uuid}
    (UUID/randomUUID)                    nil
+
    })
 
 (deftest round-tripping
@@ -45,8 +47,7 @@
     (doseq [[x opts] examples]
       ;; null means classes didn't match after round-trip
       (is (= x (round-trip* x opts))
-          (format "Class %s doesn't round-trip correctly!" (class x)))))
-  )
+          (format "Class %s doesn't round-trip correctly!" (class x))))))
 ;;================<GENERATIVE TESTING>==================
 (def default-runs 10000)
 
@@ -95,3 +96,9 @@
 (defspec round-tripping-gen-uuid-str default-runs
   (prop/for-all [v (gen/vector (gen/fmap str gen/uuid))]
     (= v (round-trip* v {:encoding :uuid}))))
+
+(defspec round-tripping-gen-rbs default-runs
+  (prop/for-all [^bytes v gen/bytes]
+    (let [rbc       (ba/fromBytes ReadableByteChannel v nil)
+          rbc-bytes (ba/toBytes rbc {:buffer-size 10})]
+      (Arrays/equals v rbc-bytes))))

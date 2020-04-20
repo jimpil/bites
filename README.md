@@ -91,8 +91,6 @@ to read something larger than that into a single byte-array).
 See [rapio](https://github.com/jimpil/rapio) 
 for reading **local** resources larger than 2GB into a sequence of byte-arrays.     
 
-## Requirements
-- Java 9+
 
 ## License
 

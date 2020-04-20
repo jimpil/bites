@@ -1,21 +1,20 @@
 (ns bites.array
   (:require [bites
+             [protocols :as proto]
              [constants :as constants]
-             [util :as ut]])
+             [util :as ut]]
+            [clojure.java.io :as io])
   (:import (java.nio ByteBuffer)
            (java.nio.charset Charset)
            (java.nio.file Files)
            (java.nio.channels FileChannel$MapMode FileChannel ReadableByteChannel Channels)
            (java.net URI URL)
-           (java.io File InputStream ByteArrayOutputStream ObjectOutputStream Serializable ByteArrayInputStream ObjectInputStream)
+           (java.io File InputStream ByteArrayOutputStream ObjectOutputStream Serializable ByteArrayInputStream ObjectInputStream FileInputStream)
            (java.util UUID)
            (javax.imageio ImageIO)
            (java.awt.image BufferedImage)))
 
-(defprotocol ToByteArray
-  (toBytes ^bytes [x opts]))
 
-(defmulti fromBytes (fn [klass x opts] klass))
 
 ;;==============<PRIVATE HELPERS>================
 (defn- base-encoded
@@ -23,7 +22,7 @@
   (if (empty? s)
     (byte-array 0)
     (case enc
-      :uuid (-> (UUID/fromString s) (toBytes s))
+      :uuid (-> (UUID/fromString s) (proto/toBytes s))
       :b2  (ut/binary-bytes s)
       :b8  (ut/octal-bytes s)
       :b64 (ut/b64-bytes s b64-flavor)
@@ -35,7 +34,7 @@
   (if (empty? bs)
     constants/EMPTY_STRING
     (case enc
-      :uuid (str (fromBytes UUID bs nil))
+      :uuid (str (proto/fromBytes UUID bs nil))
       :b2  (ut/binary-str bs)
       :b8  (ut/octal-str bs)
       :b64 (ut/b64-str bs b64-flavor)
@@ -43,42 +42,42 @@
       nil)))
 
 ;;==============<CONCRETIONS>================
-(defmethod fromBytes UUID
+(defmethod proto/fromBytes UUID
   [_ ^bytes bs _]
   (let [bb   (ByteBuffer/wrap bs)
         high (.getLong bb)
         low  (.getLong bb)]
     (UUID. high low)))
 
-(defmethod fromBytes Integer
+(defmethod proto/fromBytes Integer
   [_ ^bytes bs _]
   (-> bs ByteBuffer/wrap .getInt))
 
-(defmethod fromBytes Long
+(defmethod proto/fromBytes Long
   [_ ^bytes bs _]
   (-> bs ByteBuffer/wrap .getLong))
 
-(defmethod fromBytes Double
+(defmethod proto/fromBytes Double
   [_ ^bytes bs _]
   (-> bs ByteBuffer/wrap .getDouble))
 
-(defmethod fromBytes BigInteger
+(defmethod proto/fromBytes BigInteger
   [_ ^bytes bs _]
   (BigInteger. bs))
 
-(defmethod fromBytes BigDecimal
+(defmethod proto/fromBytes BigDecimal
   [_ ^bytes bs _]
   (let [scale-bs   (byte-array (take 4 bs))
-        ^int scale (fromBytes Integer scale-bs nil)
+        ^int scale (proto/fromBytes Integer scale-bs nil)
         unscaled-value-bs (byte-array (drop 4 bs))
         unscaled-value (BigInteger. unscaled-value-bs)]
     (BigDecimal. unscaled-value scale)))
 
-(defmethod fromBytes InputStream
+(defmethod proto/fromBytes InputStream
   [_ ^bytes bs _]
   (ByteArrayInputStream. bs))
 
-(defmethod fromBytes String
+(defmethod proto/fromBytes String
   [_ ^bytes bs opts]
   (if-let [enc (:encoding opts)]
     (condp instance? enc
@@ -87,21 +86,21 @@
       (base-decoded bs enc (:b64-flavor opts)))
     (String. bs)))
 
-(defmethod fromBytes BufferedImage
+(defmethod proto/fromBytes BufferedImage
   [_ ^bytes bs _]
   (let [in (ByteArrayInputStream. bs)]
     (ImageIO/read in)))
 
-(defmethod fromBytes ByteBuffer
+(defmethod proto/fromBytes ByteBuffer
   [_ ^bytes bs _]
   (ByteBuffer/wrap bs))
 
-(defmethod fromBytes ReadableByteChannel
+(defmethod proto/fromBytes ReadableByteChannel
   [_ ^bytes bs _]
   (let [in (ByteArrayInputStream. bs)]
     (Channels/newChannel in)))
 
-(defmethod fromBytes Serializable
+(defmethod proto/fromBytes Serializable
   [_ ^bytes bs _]
   (let [in (ByteArrayInputStream. bs)]
     (with-open [oin (ObjectInputStream. in)]
@@ -110,7 +109,7 @@
 ;;----------------------------------------------
 
 
-(extend-protocol ToByteArray
+(extend-protocol proto/ToByteArray
   Integer
   (toBytes [this _]
     (let [bb (ByteBuffer/allocate Integer/BYTES)]
@@ -139,7 +138,7 @@
           bi-bytes  (.toByteArray bi)
           bi-length (alength bi-bytes)
           scale     (.scale this)
-          scale-bytes (toBytes scale nil)
+          scale-bytes (proto/toBytes scale nil)
           ret (byte-array (+ 4 bi-length) scale-bytes)]
       (System/arraycopy bi-bytes 0 ret 4 bi-length)
       ret))
@@ -161,30 +160,34 @@
       (.array bb)))
 
   InputStream
-  (toBytes [this _]
-    (.readAllBytes this))
+  (toBytes [this opts]
+    (let [buffer (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
+          out (ByteArrayOutputStream. buffer)]
+      (io/copy this out)
+      (.toByteArray out)))
 
   File
   (toBytes [this opts]
-    ;; could delegate to `InputStream` impl
-    (Files/readAllBytes (.toPath this)))
+    (with-open [in (FileInputStream. this)]
+      (-> (.getChannel in)
+          (proto/toBytes opts))))
 
   FileChannel
-  (toBytes [this _]
-    (-> this
-        (.map FileChannel$MapMode/READ_ONLY 0 (.size this))
-        .array))
+  (toBytes [this opts]
+    (let [buf (ByteBuffer/allocate (.size this))]
+      (.read this buf)
+      (proto/toBytes buf opts)))
 
   URL
   (toBytes [this opts]
     (with-open [in (.openStream this)]
       ;; delegates to `InputStream` impl
-      (toBytes in opts)))
+      (proto/toBytes in opts)))
 
   URI
   (toBytes [this opts]
     ;; delegates to `URL` impl
-    (-> this .toURL (toBytes opts)))
+    (-> this .toURL (proto/toBytes opts)))
 
   BufferedImage
   (toBytes [this opts]
@@ -203,30 +206,28 @@
   ReadableByteChannel
   (toBytes [this opts]
     (let [buffer-size (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
-          read!       #(.read this %)]
-      (loop [ret    (transient [])
+          read!  #(.read this %)]
+      (loop [accum  (transient [])
              buffer (ByteBuffer/allocate buffer-size)
              nread  (read! buffer)]
         (cond
-          (> (count ret) constants/MAX_ARRAY_SIZE)
+          (> (count accum) constants/MAX_ARRAY_SIZE)
           ;; mimic `Files/readAllBytes` method
           (throw (OutOfMemoryError. "Required array size too large"))
           ;; EOS - return result
-          (neg? nread)
-          (-> ret persistent! byte-array)
+          (neg? nread)  (-> accum persistent! byte-array)
           ;; nothing was read - recur without touching anything
-          (zero? nread)
-          (recur ret buffer (read! buffer))
+          (zero? nread) (recur accum buffer (read! buffer))
           ;; something was read - grow the result, clear the buffer and recur
           :else
-          (let [relevant   (cond->> (.array buffer)
-                                    (< nread buffer-size) (take nread))
-                ret        (reduce conj! ret relevant)
-                buffer     (.clear buffer)]
-            (recur ret buffer (read! buffer)))))))
+          (let [relevant (cond->> (.array buffer)
+                                  (< nread buffer-size) (take nread))
+                accum    (reduce conj! accum relevant)
+                buffer   (.clear buffer)]
+            (recur accum buffer (read! buffer)))))))
 
   Serializable
-  (toBytes [this opts]
+  (proto/toBytes [this opts]
     (let [buffer (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
           out (ByteArrayOutputStream. buffer)]
       (with-open [oout (ObjectOutputStream. out)]

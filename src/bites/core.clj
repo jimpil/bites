@@ -1,5 +1,5 @@
 (ns bites.core
-  (:require [bites.array :as ba]))
+  (:require [bites.protocols :as proto]))
 
 ;(set! *warn-on-reflection* true)
 
@@ -10,7 +10,7 @@
   (^bytes [x]
    (to-bytes x nil))
   (^bytes [x opts]
-   (ba/toBytes x opts)))
+   (proto/toBytes x opts)))
 
 (defn from-bytes
   "Wrapper around `fromBytes` multi-method.
@@ -19,7 +19,7 @@
   ([klass x]
    (from-bytes klass x nil))
   ([klass x opts]
-   (ba/fromBytes klass x opts)))
+   (proto/fromBytes klass x opts)))
 
 (defmacro def-from
   "Defines a type-hinted (per <klass>) function named <sym> taking 1 or 2 args,

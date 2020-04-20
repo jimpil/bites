@@ -4,7 +4,7 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :refer [defspec]]
-            [bites.array :as ba]
+            [bites.protocols :as proto]
             [bites.util :as ut])
   (:import (java.nio.charset StandardCharsets)
            (java.util UUID Arrays)
@@ -16,8 +16,8 @@
    and checks that classes match - returns nil if they don't."
   [obj opts]
   (let [obj-class (class obj)
-        obj-bytes (ba/toBytes obj opts)
-        round-tripped (ba/fromBytes obj-class obj-bytes opts)
+        obj-bytes (proto/toBytes obj opts)
+        round-tripped (proto/fromBytes obj-class obj-bytes opts)
         round-tripped-class (class round-tripped)]
     (if (= obj-class round-tripped-class)
       round-tripped
@@ -51,54 +51,54 @@
 ;;================<GENERATIVE TESTING>==================
 (def default-runs 10000)
 
-(defspec round-tripping-gen-small-int default-runs
+(defspec gen-small-int default-runs
   (prop/for-all [v (gen/vector gen/small-integer)]
     (= v (round-trip* v nil))))
 
-(defspec round-tripping-gen-large-int default-runs
+(defspec gen-large-int default-runs
   (prop/for-all [v (gen/vector gen/large-integer)]
     (= v (round-trip* v nil))))
 
-(defspec round-tripping-gen-double default-runs
+(defspec gen-double default-runs
   (prop/for-all [v (gen/vector (gen/double* {:NaN? false}))]
     (= v (round-trip* v nil))))
 
-(defspec round-tripping-gen-ascii-string default-runs
+(defspec gen-ascii-string default-runs
   (prop/for-all [v (gen/vector gen/string-ascii)]
     (= v (round-trip* v {:encoding StandardCharsets/US_ASCII}))))
 
-(defspec round-tripping-gen-utf8-string default-runs
+(defspec gen-utf8-string default-runs
   (prop/for-all [v (gen/vector gen/string)]
     (= v (round-trip* v {:encoding "UTF-8"}))))
 
-(defspec round-tripping-gen-hex-string default-runs
+(defspec gen-hex-string default-runs
   (prop/for-all [v (gen/fmap ;; use external lib during testing
                      #(Hex/encodeHexString ^bytes %)
                      gen/bytes)]
     (= v (round-trip* v {:encoding :b16}))))
 
-(defspec round-tripping-gen-octal-string default-runs
+(defspec gen-octal-string default-runs
   (prop/for-all [v (gen/fmap
                      #(if (empty? %) "" (ut/octal-str %))
                      gen/bytes)]
     (= v (round-trip* v {:encoding :b8}))))
 
-(defspec round-tripping-gen-binary-string default-runs
+(defspec gen-binary-string default-runs
   (prop/for-all [v (gen/fmap ;; use external lib during testing
                      #(String. (BinaryCodec/toAsciiBytes ^bytes %))
                      gen/bytes)]
     (= v (round-trip* v {:encoding :b2}))))
 
-(defspec round-tripping-gen-uuid default-runs
+(defspec gen-uuid default-runs
   (prop/for-all [v (gen/vector gen/uuid)]
     (= v (round-trip* v nil))))
 
-(defspec round-tripping-gen-uuid-str default-runs
+(defspec gen-uuid-str default-runs
   (prop/for-all [v (gen/vector (gen/fmap str gen/uuid))]
     (= v (round-trip* v {:encoding :uuid}))))
 
-(defspec round-tripping-gen-rbs default-runs
+(defspec gen-byte-channel default-runs
   (prop/for-all [^bytes v gen/bytes]
-    (let [rbc       (ba/fromBytes ReadableByteChannel v nil)
-          rbc-bytes (ba/toBytes rbc {:buffer-size 10})]
+    (let [rbc       (proto/fromBytes ReadableByteChannel v nil)
+          rbc-bytes (proto/toBytes rbc {:buffer-size 16})]
       (Arrays/equals v rbc-bytes))))

@@ -87,8 +87,10 @@
 
 (defmethod do-copy [ByteBuffer WritableByteChannel]
   [^ByteBuffer in ^WritableByteChannel out _]
-  (while (.hasRemaining in)
-    (.write out in)))
+  (loop [written 0]
+    (if (.hasRemaining in)
+      (recur (+ written (.write out in)))
+      written)))
 
 (defmethod do-copy [String WritableByteChannel]
   [^String in ^WritableByteChannel out opts]

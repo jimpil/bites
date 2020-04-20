@@ -3,9 +3,10 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :refer [defspec]]
+            [bites.array :as array]
             [bites.io :as bio])
   (:import (java.util Arrays)
-           (java.nio.channels Channels)
+           (java.nio.channels Channels Pipe)
            (java.nio ByteBuffer)
            (java.io ByteArrayOutputStream StringReader ByteArrayInputStream)))
 
@@ -42,8 +43,8 @@
     (let [in   (StringReader. v)
           bout (ByteArrayOutputStream.)
           out  (Channels/newChannel bout)]
-      (bio/copy v out {:encoding "ASCII"
-                       :buffer-size 8})
+      (bio/copy in out {:encoding "ASCII"
+                        :buffer-size 8})
       (= v (String. (.toByteArray bout))))))
 
 (defspec copy-byte-stream-to-byte-stream default-runs
@@ -54,3 +55,9 @@
           out  (Channels/newChannel bout)]
       (bio/copy in out {:buffer-size 13})
       (Arrays/equals v (.toByteArray bout)))))
+
+(deftest copy-to-pipe
+  (let [v (byte-array (gen/generate gen/bytes (rand-int 2000)))]
+    (let [pipe (Pipe/open)]
+      (bio/pipe-into! pipe v)
+      (Arrays/equals v (bio/pipe-from! pipe (alength v))))))

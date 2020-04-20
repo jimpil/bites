@@ -6,7 +6,7 @@
             [bites.protocols :as proto]
             [bites.constants :as constants])
   (:import (java.nio ByteBuffer CharBuffer)
-           (java.nio.channels ReadableByteChannel Channels WritableByteChannel FileChannel)
+           (java.nio.channels ReadableByteChannel Channels WritableByteChannel FileChannel Pipe)
            (java.io InputStream OutputStream Writer File FileOutputStream FileInputStream Reader)
            (java.nio.charset Charset CharsetEncoder)
            (java.util Arrays)))
@@ -181,3 +181,9 @@
         (.write out buffer)
         (.compact buffer)
         (recur)))))
+
+(defn pipe-into!
+  ([pipe x]
+   (pipe-into! pipe x nil))
+  ([^Pipe pipe x opts]
+   (copy x (.sink pipe) opts)))

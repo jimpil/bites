@@ -140,6 +140,11 @@
 
 ;; ReadableByteChannel => OutputStream and the opposite
 ;; InputStream         => WritableByteChannel
+
+(defmethod do-copy [ReadableByteChannel ByteBuffer]
+  [^ReadableByteChannel in ^ByteBuffer out opts]
+  (.read in out))
+
 (defmethod do-copy [ReadableByteChannel OutputStream]
   [^ReadableByteChannel in ^OutputStream out opts]
   (do-copy in (Channels/newChannel out) opts))
@@ -183,7 +188,15 @@
         (recur)))))
 
 (defn pipe-into!
+  "Writes <x> into this Pipe's sink-channel."
   ([pipe x]
    (pipe-into! pipe x nil))
   ([^Pipe pipe x opts]
    (copy x (.sink pipe) opts)))
+
+(defn pipe-from!
+  "Reads <n> bytes from this Pipe's source-channel."
+  ^bytes [^Pipe pipe n]
+  (let [buf (ByteBuffer/allocate n)]
+    (copy (.source pipe) buf nil)
+    (.array buf)))

@@ -29,11 +29,13 @@ The focus is on the following objects (followed by an optional map), but there a
 - `java.math.BigDecimal`
 - `java.lang.String` -  {:encoding  (or string? charset? #{:b2 :b8 :b16 :b64 :uuid}) :b64-flavor #{:mime :url}}
 - `java.util.UUID`
-- `java.io.InputStream` -  {:buffer-size pos-int?} (defaults to 1024)
+- `java.io.InputStream` -  {:buffer-size pos-int?}
 - `java.io.File`  -  {:buffer-size pos-int?} 
 - `java.net.URL`  -  {:buffer-size pos-int?}
 - `java.net.URI`  -  {:buffer-size pos-int?}
 - `java.awt.image.BufferedImage` - {:buffer-size pos-int? :image-type string?}
+- `java.nio.ByteBuffer` 
+- `java.nio.channels.ReadableByteChannel` - {:buffer-size pos-int?} 
 - `java.io.Serializable`
 
 One could argue that `java.lang.String` deserves extra attention, as it can represent various encodings (e.g. unicode, baseN, uuid etc).

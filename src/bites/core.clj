@@ -84,11 +84,12 @@
    (i.e. their respective operation exhausted the array it was working with).
    Returns a vector of two futures (representing the producing/consuming loops).
    Cancelling either stops its internal loop. A slow consumer will (eventually)
-   block a fast producer, so a non-blocking consuming-fn is ideal.
-
+   block a faster producer, so a non-blocking consuming-fn would be ideal.
+   This type of data-exchange between two threads requires no GC.
    See `java.util.concurrent.Exchanger` for the core idea,
    and the underlying construct this is implemented on top of."
   [buffer produce! consume!]
-  (let [exch (Exchanger.)]
-    [(future (start-producing-with produce! buffer exch))
-     (future (start-consuming-with consume! buffer exch))]))
+  (assert (pos-int? buffer) "buffer must be a positive integer")
+  (let [exchanger (Exchanger.)]
+    [(future (start-producing-with produce! buffer exchanger))
+     (future (start-consuming-with consume! buffer exchanger))]))

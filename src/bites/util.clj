@@ -106,3 +106,6 @@
     (byte (bit-or -128 (- x 128)))
     (byte x)))
 
+(defn current-thread-interrupted? []
+  (.isInterrupted (Thread/currentThread)))
+

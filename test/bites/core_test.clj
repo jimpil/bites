@@ -6,14 +6,14 @@
 (deftest blocking-exchange-test
   (let [ret   (agent [])
         done? (promise)
-        limit 100
+        limit 1000
         consume! (partial send-off ret conj)
         id (AtomicLong. 0)
         produce* (partial str "Message-")
-        produce! (fn [] ;; produce at random intervals
-                   (Thread/sleep (rand-int 500))
+        produce! (fn [] ;; produce at random intervals when printing
+                   ;(Thread/sleep (rand-int 200))
                    (produce* (.incrementAndGet id)))
-        [prod-fut consu-fut] (with-blocking-exchange! 10 produce! consume!)]
+        [prod-fut consu-fut] (with-blocking-exchange! 128 produce! consume!)]
     (add-watch ret :abort
       (fn [_ _ _ n]
         (when (= limit (count n))
@@ -23,7 +23,8 @@
         ;(println (peek n))
         ))
     (and @done?
-         (is (= limit (.get id)))
-         (is (= @ret (mapv produce* (range 1 (inc limit))))))
+         (is (<= limit (.get id)))
+         (is (= @ret (mapv produce* (range 1 (inc (count @ret))))))
+         )
     )
   )

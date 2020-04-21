@@ -77,7 +77,7 @@
         (do (aset buf idx (produce!))
             (recur (unchecked-inc idx) buf))))))
 
-(defn with-blocking-exchange!
+(defn with-sync-exchange!
   "Given a producing-fn (no-args), and a consuming-fn (1-arg),
    assign each its own thread and object-array of size <buffer>,
    and has them exchanging arrays when they're BOTH ready

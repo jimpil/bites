@@ -174,7 +174,7 @@
   [^File in ^WritableByteChannel out _]
   (with-open [^FileChannel ch (Channels/newChannel
                                 (FileInputStream. in))]
-    (.transferTo ch out 0 Long/MAX_VALUE)
+    (.transferTo ch 0 Long/MAX_VALUE out)
     nil))
 
 ;; ReadableByteChannel =>  WritableByteChannel (base case)

@@ -4,11 +4,14 @@
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :refer [defspec]]
             [bites.array :as array]
-            [bites.io :as bio])
+            [bites.io :as bio]
+            [clojure.java.io :as io]
+            [clojure.string :as str])
   (:import (java.util Arrays)
            (java.nio.channels Channels Pipe)
            (java.nio ByteBuffer)
-           (java.io ByteArrayOutputStream StringReader ByteArrayInputStream)))
+           (java.io ByteArrayOutputStream StringReader ByteArrayInputStream)
+           (java.nio.file Files)))
 
 (def default-runs 10000)
 
@@ -57,7 +60,32 @@
       (Arrays/equals v (.toByteArray bout)))))
 
 (deftest copy-to-pipe
-  (let [v (byte-array (gen/generate gen/bytes (rand-int 2000)))]
-    (let [pipe (Pipe/open)]
-      (bio/into-pipe! pipe v)
-      (Arrays/equals v (bio/from-pipe! pipe (alength v))))))
+  (let [v (byte-array (gen/generate gen/bytes (rand-int 2000)))
+        pipe (Pipe/open)]
+    (bio/into-pipe! pipe v)
+    (Arrays/equals v (bio/from-pipe! pipe (alength v)))))
+
+(deftest copy-file
+  (let [temp-path "/tmp/bite.txt"
+        temp-file (io/file temp-path)
+        data (str/join \newline (gen/generate gen/string-ascii 200))
+        data-bytes (.getBytes data)]
+
+    ;; this test creates the file
+    (testing "readable-byte-channel->file"
+      (let [bin (ByteArrayInputStream. data-bytes)
+            rch (Channels/newChannel bin)]
+        (bio/copy rch temp-file nil)
+        (is (Arrays/equals data-bytes (Files/readAllBytes (.toPath temp-file))))))
+
+    (testing "file->writeable-byte-channel"
+      (let [bout (ByteArrayOutputStream.)
+            wch  (Channels/newChannel bout)]
+        (bio/copy temp-file wch nil)
+        (is (Arrays/equals data-bytes (.toByteArray bout)))))
+
+    (io/delete-file temp-path))
+
+
+  )
+

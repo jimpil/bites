@@ -5,6 +5,7 @@
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :refer [defspec]]
             [bites.protocols :as proto]
+            [bites.array :refer :all]
             [bites.util :as ut])
   (:import (java.nio.charset StandardCharsets)
            (java.util UUID Arrays)

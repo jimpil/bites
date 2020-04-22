@@ -10,7 +10,7 @@
         done? (promise)
         limit 1000
         consume! (partial send-off ret conj)
-        id (AtomicLong. 0)
+        id    (AtomicLong. 0)
         produce* (partial str "Message-")
         produce! (fn [] ;; produce at random intervals
                    (Thread/sleep (rand-int 100))
@@ -34,9 +34,10 @@
   (do-exchange-test!
     (fn [p c]
       (->> (with-sync-exchange! 128 p c)
+           ;; need a seq of 2 seqs
            (map vector)))))
 
 (deftest async-exchange-test
   (do-exchange-test!
-    (partial with-async-exchange!
+    (partial with-blocking-queue!
              (ArrayBlockingQueue. 256 true))))

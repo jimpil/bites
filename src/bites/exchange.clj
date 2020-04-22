@@ -68,7 +68,7 @@
   (while (not (ut/current-thread-interrupted?))
     (consume! (.take q))))
 
-(defn with-async-exchange!
+(defn with-blocking-queue!
   "The opposite of `with-sync-exchange` in terms of semantics
   (i.e. synchronous/bi-directional VS asynchronous/one-directional).
   The benefit here is that multiple producers/consumers are supported.
@@ -79,7 +79,7 @@
   the same order as the provided producing/consuming fns)."
   ([produce! consume!]
    (let [Q (ArrayBlockingQueue. constants/DEFAULT_BUFFER_SIZE true)]
-     (with-async-exchange! Q produce! consume!)))
+     (with-blocking-queue! Q produce! consume!)))
   ([^BlockingQueue buffer produce! consume!]
    (let [produce-with (partial start-producing-into buffer)
          consume-with (partial start-consuming-from buffer)]

@@ -6,8 +6,7 @@
             [clojure.java.io :as io])
   (:import (java.nio ByteBuffer)
            (java.nio.charset Charset)
-           (java.nio.file Files)
-           (java.nio.channels FileChannel$MapMode FileChannel ReadableByteChannel Channels)
+           (java.nio.channels FileChannel ReadableByteChannel Channels)
            (java.net URI URL)
            (java.io File InputStream ByteArrayOutputStream ObjectOutputStream Serializable ByteArrayInputStream ObjectInputStream FileInputStream)
            (java.util UUID)
@@ -174,7 +173,7 @@
 
   FileChannel
   (toBytes [this opts]
-    (let [buf (ByteBuffer/allocate (.size this))]
+    (let [buf (ByteBuffer/allocate (int (.size this)))]
       (.read this buf)
       (proto/toBytes buf opts)))
 

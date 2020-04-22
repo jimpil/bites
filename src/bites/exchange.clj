@@ -1,7 +1,8 @@
 (ns bites.exchange
-  (:require [bites.util :as ut])
-  (:import (java.util.concurrent Exchanger TimeUnit)))
-
+  (:require [bites.util :as ut]
+            [bites.constants :as constants])
+  (:import (java.util.concurrent Exchanger TimeUnit ArrayBlockingQueue BlockingQueue)))
+;; ======================<SYNCHRONOUS & BIDIRECTIONAL>========================
 (defn exchange!
   ([^Exchanger e x]
    (.exchange e x))
@@ -40,9 +41,62 @@
    Unlike using a typical data-structure, this kind of data-exchange between two
    threads is allocation-free (but synchronous). See `java.util.concurrent.Exchanger`
    for the core idea, and the underlying construct this is implemented on top of."
+  ([produce! consume!]
+   (with-sync-exchange! 512 produce! consume!))
   ([buffer produce! consume!]
    (assert (pos-int? buffer) "buffer must be a positive integer")
    (let [exchanger (Exchanger.)]
      [(future (start-producing-with produce! buffer exchanger))
       (future (start-consuming-with consume! buffer exchanger))])))
+
+
+;; ======================<ASYNCHRONOUS & 1-DIRECTIONAL>========================
+
+(defn start-producing-into
+  "An endless (unless thread interrupted)
+   producing loop for this given queue.
+   `produce!` must be a fn of no-args."
+  [^BlockingQueue q produce!]
+  (while (not (ut/current-thread-interrupted?))
+    (.put q (produce!))))
+
+(defn start-consuming-from
+  "An endless (unless thread interrupted)
+   consuming loop for this given queue.
+   `consume!` must be a fn of 1-arg."
+  [^BlockingQueue q consume!]
+  (while (not (ut/current-thread-interrupted?))
+    (consume! (.take q))))
+
+(defn with-async-exchange!
+  "The opposite of `with-sync-exchange` in terms of semantics
+  (i.e. synchronous/bi-directional VS asynchronous/one-directional).
+  The benefit here is that multiple producers/consumers are supported.
+  Default queue is a fair `ArrayBlockingQueue` with capacity 1024,
+  which should exhibit very similar memory allocation characteristics
+  with a `with-sync-exchange`call (also with default buffer).
+  Returns a vector of two vectors (the producing/consuming futures in
+  the same order as the provided producing/consuming fns)."
+  ([produce! consume!]
+   (let [Q (ArrayBlockingQueue. constants/DEFAULT_BUFFER_SIZE true)]
+     (with-async-exchange! Q produce! consume!)))
+  ([^BlockingQueue buffer produce! consume!]
+   (let [produce-with (partial start-producing-into buffer)
+         consume-with (partial start-consuming-from buffer)]
+
+     [(if (sequential? produce!) ;; n producers
+        (let [[produce! n] produce!]
+          (->> #(future (produce-with produce!))
+               (repeatedly n)
+               doall))
+        [(future (produce-with produce!))])
+
+      (if (sequential? consume!)
+        (let [[consume! n] consume!] ;; n consumers
+          (->> #(future (consume-with consume!))
+               (repeatedly n)
+               doall))
+        [(future (consume-with consume!))])])
+
+   ))
 

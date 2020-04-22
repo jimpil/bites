@@ -182,21 +182,20 @@
   [^ReadableByteChannel in ^WritableByteChannel out opts]
   (let [buffer (ByteBuffer/allocate
                  (:buffer-size opts constants/DEFAULT_BUFFER_SIZE))]
-    (loop [] ;; per the Java docs
-      (when-not (neg? (.read in buffer))
-        (.flip buffer)
-        (.write out buffer)
-        (.compact buffer)
-        (recur)))))
+    ;; per the Java docs
+    (while (not (neg? (.read in buffer)))
+      (.flip buffer)
+      (.write out buffer)
+      (.compact buffer))))
 
-(defn pipe-into!
+(defn into-pipe!
   "Writes <x> into this Pipe's sink-channel."
   ([pipe x]
-   (pipe-into! pipe x nil))
+   (into-pipe! pipe x nil))
   ([^Pipe pipe x opts]
    (copy x (.sink pipe) opts)))
 
-(defn pipe-from!
+(defn from-pipe!
   "Reads <n> bytes from this Pipe's source-channel."
   ^bytes [^Pipe pipe n]
   (let [buf (ByteBuffer/allocate n)]

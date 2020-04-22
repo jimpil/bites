@@ -59,5 +59,5 @@
 (deftest copy-to-pipe
   (let [v (byte-array (gen/generate gen/bytes (rand-int 2000)))]
     (let [pipe (Pipe/open)]
-      (bio/pipe-into! pipe v)
-      (Arrays/equals v (bio/pipe-from! pipe (alength v))))))
+      (bio/into-pipe! pipe v)
+      (Arrays/equals v (bio/from-pipe! pipe (alength v))))))

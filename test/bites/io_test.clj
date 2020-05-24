@@ -3,7 +3,7 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :refer [defspec]]
-            [bites.array :as array]
+            [bites.core :as core]
             [bites.io :as bio]
             [clojure.java.io :as io]
             [clojure.string :as str])
@@ -21,14 +21,14 @@
           bout (ByteArrayOutputStream.)
           out  (Channels/newChannel bout)]
       (bio/copy in out nil)
-      (Arrays/equals v (.toByteArray bout)))))
+      (Arrays/equals v (core/to-bytes bout)))))
 
 (defspec copy-string-to-byte-stream default-runs
   (prop/for-all [v gen/string-ascii]
     (let [bout (ByteArrayOutputStream.)
           out  (Channels/newChannel bout)]
       (bio/copy v out {:encoding "ASCII"})
-      (= v (String. (.toByteArray bout))))))
+      (= v (String. (core/to-bytes bout))))))
 
 (defspec copy-CHARS-to-byte-stream default-runs
   (prop/for-all [^chars v (gen/fmap char-array (gen/vector gen/char-ascii))]
@@ -36,7 +36,7 @@
           out  (Channels/newChannel bout)]
       (bio/copy v out nil)
       (->> bout
-           .toByteArray
+           core/to-bytes
            String.
            .toCharArray
            (Arrays/equals v)))))
@@ -48,7 +48,7 @@
           out  (Channels/newChannel bout)]
       (bio/copy in out {:encoding "ASCII"
                         :buffer-size 8})
-      (= v (String. (.toByteArray bout))))))
+      (= v (String. (core/to-bytes bout))))))
 
 (defspec copy-byte-stream-to-byte-stream default-runs
   (prop/for-all [^bytes v gen/bytes]
@@ -57,7 +57,7 @@
           bout (ByteArrayOutputStream.)
           out  (Channels/newChannel bout)]
       (bio/copy in out {:buffer-size 13})
-      (Arrays/equals v (.toByteArray bout)))))
+      (Arrays/equals v (core/to-bytes bout)))))
 
 (deftest copy-to-pipe
   (let [v (byte-array (gen/generate gen/bytes (rand-int 2000)))
@@ -82,7 +82,7 @@
       (let [bout (ByteArrayOutputStream.)
             wch  (Channels/newChannel bout)]
         (bio/copy temp-file wch nil)
-        (is (Arrays/equals data-bytes (.toByteArray bout)))))
+        (is (Arrays/equals data-bytes (core/to-bytes bout)))))
 
     (io/delete-file temp-path))
 

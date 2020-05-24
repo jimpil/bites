@@ -142,6 +142,10 @@
       (System/arraycopy bi-bytes 0 ret 4 bi-length)
       ret))
 
+  ByteArrayOutputStream
+  (toBytes [this _]
+    (.toByteArray this))
+
   String
   (toBytes [this opts]
     (if-let [enc (:encoding opts)]
@@ -163,7 +167,7 @@
     (let [buffer (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
           out (ByteArrayOutputStream. buffer)]
       (io/copy this out)
-      (.toByteArray out)))
+      (proto/toBytes out nil)))
 
   File
   (toBytes [this opts]
@@ -194,7 +198,7 @@
           ^String img-type (:image-type opts "png")
           out (ByteArrayOutputStream. buffer)]
       (ImageIO/write this img-type out)
-      (.toByteArray out)))
+      (proto/toBytes out nil)))
 
   ByteBuffer
   (toBytes [this _]
@@ -232,6 +236,6 @@
       (with-open [oout (ObjectOutputStream. out)]
         (.writeObject oout this)
         (.flush oout)
-        (.toByteArray out))))
+        (proto/toBytes out nil))))
 
   )

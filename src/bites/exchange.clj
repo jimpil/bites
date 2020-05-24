@@ -27,14 +27,15 @@
     (when-not (ut/current-thread-interrupted?)
       (if (= buffer idx)
         (recur 0 (exchange! exch buf))
-        (do (aset buf idx (produce!))
+        (do (aset buf idx (produce! (aget buf idx)))
             (recur (unchecked-inc idx) buf))))))
 
 (defn with-sync-exchange!
-  "Given a producing-fn (no-args), and a consuming-fn (1-arg),
+  "Given a producing-fn, and a consuming-fn (both 1-arg),
    assign each its own thread and object-array of size <buffer>,
    and has them exchanging arrays when they're BOTH ready
    (i.e. their respective operation exhausted the array it was working with).
+   During the initial producing, the producing-fn must be able to deal with nils.
    Returns a vector of two futures (representing the producing/consuming loops).
    Cancelling either stops its internal loop. A slow consumer will (eventually)
    block a faster producer, so a non-blocking consuming-fn would be ideal.
@@ -55,7 +56,7 @@
 (defn start-producing-into
   "An endless (unless thread interrupted)
    producing loop for this given queue.
-   `produce!` must be a fn of no-args."
+   `produce!` must be a no-arg fn."
   [^BlockingQueue q produce!]
   (while (not (ut/current-thread-interrupted?))
     (.put q (produce!))))
@@ -63,7 +64,7 @@
 (defn start-consuming-from
   "An endless (unless thread interrupted)
    consuming loop for this given queue.
-   `consume!` must be a fn of 1-arg."
+   `consume!` must be a 1-arg fn."
   [^BlockingQueue q consume!]
   (while (not (ut/current-thread-interrupted?))
     (consume! (.take q))))
@@ -74,8 +75,8 @@
   The benefit here is that multiple producers/consumers are supported.
   Default queue is a fair `ArrayBlockingQueue` with capacity 1024,
   which should exhibit very similar memory allocation characteristics
-  with a `with-sync-exchange`call (also with default buffer).
-  Returns a vector of two vectors (the producing/consuming futures in
+  with a `with-sync-exchange` call (with default buffer).
+  Returns a vector of two seqs (the producing/consuming futures in
   the same order as the provided producing/consuming fns)."
   ([produce! consume!]
    (let [Q (ArrayBlockingQueue. constants/DEFAULT_BUFFER_SIZE true)]
@@ -96,7 +97,5 @@
           (->> #(future (consume-with consume!))
                (repeatedly n)
                doall))
-        [(future (consume-with consume!))])])
-
-   ))
+        [(future (consume-with consume!))])])))
 

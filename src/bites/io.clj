@@ -25,7 +25,7 @@
 
 (defn copy
   "Copies input to output.  Returns nil or throws IOException.
-   Input may be an InputStream, Reader, File, byte[], char[], String, ByteBuffer, or ReadableByteChannel. .
+   Input may be an InputStream, Reader, File, byte[], char[], String, ByteBuffer, or ReadableByteChannel.
    Output may be an OutputStream, Writer, File, or WritableByteChannel.
 
    Options are key/value pairs and may be one of

@@ -18,6 +18,10 @@ Yes, [commons-codec](http://commons.apache.org/proper/commons-codec/) and
 candidates and rather grander in terms of scope. Ideally, I would like a lightweight 
 (dependency-free), Clojure-native solution.
  
+ 
+## Where 
+[![Clojars Project](https://clojars.org/bites/latest-version.svg)](https://clojars.org/bites)
+ 
 
 ## Usage
 The focus is on the following objects (followed by an optional map), but there are abstractions for everything.

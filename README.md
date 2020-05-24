@@ -89,6 +89,17 @@ For example:
     (.substring 0 2)) ;; => "hi"
 ```
 
+## bites.io
+This namespace contains NIO extensions of `clojure.java.io`. It provides its own `copy` fn, because (unfortunately) 
+the `clojure.java.io/do-copy` one is private. The good news is that `bites.io/do-copy` will delegate to `clojure.java.io/do-copy`
+for anything it doesn't recognise. 
+
+## bites.exchange
+This namespace provides two different producer/consumer models. One is the well-known (one-directional) asynchronous-queueing model, 
+and the other is the (bi-directional) synchronous-exchange model. The former is good for cases where producing is completely independent
+from consuming, whereas the latter shines in situations where what will be produced depends on the outcome of consumption 
+(excluding the very first round), and as such requires a synchronous hand-off. 
+
 ## Limitations
 `to-bytes` returns a **single** byte-array. This means that the usual limitations of the JVM 
 with respect to array sizes apply here too. More specifically, array-indexing using 

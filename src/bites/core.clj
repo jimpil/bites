@@ -28,7 +28,7 @@
   [sym doc-string klass]
   `(def
      ~(with-meta sym {:tag klass})
-     ~(or doc-string (format "Type-hinted (%s) variant of `from-bytes` taking 1 or 2 args." klass))
+     ~(or doc-string (format "Type-hinted (%s) variant of `from-bytes`." klass))
      (partial from-bytes ~klass)))
 
 (comment
@@ -39,11 +39,7 @@
 
 
   ;; image->b64-str
-  (-> (ImageIO/read (io/file "...")) ;; the image in question
-      (to-bytes {:image-type "png"})
-      (bytes->string {:encoding :b64}))
-  ;; => a (potentially large) String encoding the image bytes (in Base64)
-  ;; ready to be used inside a <img> html tag
-
-
+  (-> (ImageIO/read (io/file "..."))    ;; the image in question
+      (to-bytes {:image-type "png"})    ;; its bytes
+      (bytes->string {:encoding :b64})) ;; as a (potentially large) string ready to be used inside a <img> html tag
   )

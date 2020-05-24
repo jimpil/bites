@@ -13,14 +13,14 @@
 
 (set! *warn-on-reflection* true)
 
-(defmulti
-  do-copy
+(defmulti do-copy ;; io/do-copy is private :(
   (fn [input output opts]
     [(type input) 
      (type output)]))
 
 (defmethod do-copy :default 
   [in out opts]
+  ;; delegate to io/copy for anything that doesn't match
   (apply io/copy in out opts))
 
 (defn copy
@@ -189,14 +189,16 @@
       (.compact buffer))))
 
 (defn into-pipe!
-  "Writes <x> into this Pipe's sink-channel."
+  "Writes <x> into this Pipe's sink-channel.
+   Returns nil."
   ([pipe x]
    (into-pipe! pipe x nil))
   ([^Pipe pipe x opts]
    (copy x (.sink pipe) opts)))
 
 (defn from-pipe!
-  "Reads <n> bytes from this Pipe's source-channel."
+  "Reads <n> bytes from this Pipe's source-channel.
+   Returns byte-array."
   ^bytes [^Pipe pipe n]
   (let [buf (ByteBuffer/allocate n)]
     (copy (.source pipe) buf nil)

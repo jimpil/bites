@@ -1,4 +1,7 @@
 # bites
+<p align="center">
+  <img src="https://www.atariarchives.org/mmm/bits-1.gif"/>
+</p>
 
 ## What
 

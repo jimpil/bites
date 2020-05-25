@@ -1,5 +1,6 @@
 (ns bites.array
   (:require [bites
+             [io]
              [protocols :as proto]
              [constants :as constants]
              [util :as ut]]
@@ -203,8 +204,10 @@
   ByteBuffer
   (toBytes [this _]
     (if (.hasArray this)
-      (.array this)
-      (byte-array 0)))
+      (aclone (.array this)) ;; the ByteBuffer remains usable
+      (-> this
+          (io/make-output-stream nil)
+          (proto/toBytes nil))))
 
   ReadableByteChannel
   (toBytes [this opts]
@@ -229,7 +232,7 @@
                 buffer   (.clear buffer)]
             (recur accum buffer (read! buffer)))))))
 
-  Serializable
+  Serializable ;; catch-all extension clause
   (proto/toBytes [this opts]
     (let [buffer (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
           out (ByteArrayOutputStream. buffer)]

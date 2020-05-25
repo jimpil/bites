@@ -92,7 +92,19 @@ For example:
 ## bites.io
 This namespace contains NIO extensions of `clojure.java.io`. It provides its own `copy` fn, because (unfortunately) 
 the `clojure.java.io/do-copy` one is private. The good news is that `bites.io/do-copy` will delegate to `clojure.java.io/do-copy`
-for anything it doesn't recognise. 
+for anything it doesn't recognise. More specifically...
+
+### `clojure.java.io/IOFactory`
+This is extended (where appropriate) to `ByteBuffer`, `ReadableByteChannel` and `WritableByteChannel`. 
+
+### `bites.io/copy`
+In addition to anything supported by `clojure.java.io/copy`, this will also work against the following:
+
+- ByteBuffer => OutputStream/Writer/File/WritableByteChannel
+- Reader/String/chars/bytes  => WritableByteChannel 
+- ReadableByteChannel => OutputStream/Writer/File/ByteBuffer/WritableByteChannel
+- InputStream => WritableByteChannel
+- File => WritableByteChannel
 
 ## bites.exchange
 This namespace provides two different producer/consumer models. One is the well-known (one-directional) asynchronous-queueing model, 
@@ -101,7 +113,7 @@ from consuming, whereas the latter shines in situations where what will be produ
 (excluding the very first round), and as such requires a synchronous hand-off. 
 
 ## Limitations
-`to-bytes` returns a **single** byte-array. This means that the usual limitations of the JVM 
+`to-bytes`/`from-bytes` returns/expects a **single** byte-array. This means that the usual limitations of the JVM 
 with respect to array sizes apply here too. More specifically, array-indexing using 
 32-bit integers means that ~2GB is the maximum possible size (i.e. don't expect to be able
 to read something larger than that into a single byte-array).

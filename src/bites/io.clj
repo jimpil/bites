@@ -7,11 +7,17 @@
             [bites.constants :as constants])
   (:import (java.nio ByteBuffer CharBuffer)
            (java.nio.channels ReadableByteChannel Channels WritableByteChannel FileChannel Pipe)
-           (java.io InputStream OutputStream Writer File FileOutputStream FileInputStream Reader)
+           (java.io InputStream OutputStream Writer File FileOutputStream FileInputStream Reader ByteArrayOutputStream)
            (java.nio.charset Charset CharsetEncoder)
            (java.util Arrays)))
 
 (set! *warn-on-reflection* true)
+
+(defn- charset-encoder [opts]
+  (-> opts
+      (:encoding constants/DEFAULT_CHARSET)
+      (Charset/forName)
+      .newEncoder))
 
 (defmulti do-copy ;; io/do-copy is private :(
   (fn [input output opts]
@@ -46,14 +52,16 @@
     (-> (proto/toBytes this nil)
         (io/make-reader opts)))
   (make-writer [this opts]
-    (-> (proto/toBytes this nil)
+    (-> (io/make-output-stream this nil)
         (io/make-writer opts)))
   (make-input-stream [this opts]
     (-> (proto/toBytes this nil)
         (io/make-input-stream opts)))
-  (make-output-stream [this opts]
-    (-> (proto/toBytes this nil)
-        (io/make-input-stream opts)))
+  (make-output-stream [this _]
+    (let [bout    (ByteArrayOutputStream.)
+          channel (Channels/newChannel bout)]
+      (.write channel this)
+      bout))
 
   ReadableByteChannel
   (make-reader [this opts]
@@ -72,24 +80,24 @@
 ;; ByteBuffer => OutputStream, Writer, File, WritableByteChannel
 (defmethod do-copy [ByteBuffer OutputStream]
   [^ByteBuffer in out opts]
-  (-> (.array in)
+  (-> (proto/toBytes in nil)
       (do-copy out opts)))
 
 (defmethod do-copy [ByteBuffer Writer]
   [^ByteBuffer in out opts]
-  (-> (.array in)
+  (-> (proto/toBytes in nil)
       (do-copy out opts)))
 
 (defmethod do-copy [ByteBuffer File]
   [^ByteBuffer in out opts]
-  (-> (.array in)
+  (-> (proto/toBytes in nil)
       (do-copy out opts)))
 
 (defmethod do-copy [ByteBuffer WritableByteChannel]
   [^ByteBuffer in ^WritableByteChannel out _]
   (loop [written 0]
     (if (.hasRemaining in)
-      (recur (+ written (.write out in)))
+      (recur (unchecked-add written (.write out in)))
       written)))
 
 (defmethod do-copy [String WritableByteChannel]
@@ -100,12 +108,8 @@
 
 (defmethod do-copy [constants/CHAR-ARRAY-TYPE WritableByteChannel]
   [^chars in ^WritableByteChannel out opts]
-  (let [^CharsetEncoder enc
-        (or (:encoder opts)
-            (-> opts
-                (:encoding constants/DEFAULT_CHARSET)
-                (Charset/forName)
-                .newEncoder))]
+  (let [^CharsetEncoder enc (or (:encoder opts)
+                                (charset-encoder opts))]
     (-> enc
         (.encode (CharBuffer/wrap in))
         (do-copy out opts))))
@@ -113,10 +117,7 @@
 (defmethod do-copy [Reader WritableByteChannel]
   [^Reader in ^WritableByteChannel out opts]
   (let [buf-size (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
-        encoder (-> opts 
-                    (:encoding constants/DEFAULT_CHARSET) 
-                    (Charset/forName) 
-                    .newEncoder)
+        encoder (charset-encoder opts)
         opts (assoc opts :encoder encoder)
         buffer (char-array buf-size)]
     (loop [offset 0]

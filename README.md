@@ -81,12 +81,15 @@ Defines a type-hinted version of `from-bytes` (according to `klass`), taking one
 For example:
 
 ```clj
-(def-from bytes->string nil String) ;; define it
+(def-from bytes->string  ;; define it
+  "bytes-to-string converter" 
+  String) 
 
-(-> (.getBytes "hi")
+(-> (.getBytes "hi there")
     (bytes->string  nil) ;; use it
-    ;; no reflection 
-    (.substring 0 2)) ;; => "hi"
+    (.substring 0 2))    ;; no reflection 
+
+ => "hi"
 ```
 
 ## bites.io

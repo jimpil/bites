@@ -5,7 +5,7 @@
              [constants :as constants]
              [util :as ut]]
             [clojure.java.io :as io])
-  (:import (java.nio ByteBuffer)
+  (:import (java.nio ByteBuffer ReadOnlyBufferException)
            (java.nio.charset Charset)
            (java.nio.channels FileChannel ReadableByteChannel Channels)
            (java.net URI URL)
@@ -173,8 +173,7 @@
   File
   (toBytes [this opts]
     (with-open [in (FileInputStream. this)]
-      (-> (.getChannel in)
-          (proto/toBytes opts))))
+      (-> in .getChannel (proto/toBytes opts))))
 
   FileChannel
   (toBytes [this opts]
@@ -203,11 +202,15 @@
 
   ByteBuffer
   (toBytes [this _]
-    (if (.hasArray this)
-      (aclone (.array this)) ;; the ByteBuffer remains usable
-      (-> this
-          (io/make-output-stream nil)
-          (proto/toBytes nil))))
+    (try
+      ;; one copy, but the ByteBuffer remains usable
+      (aclone (.array this))
+      (catch UnsupportedOperationException _
+        (byte-array 0))
+      (catch ReadOnlyBufferException _
+        (-> this
+            (io/make-output-stream nil)
+            (proto/toBytes nil)))))
 
   ReadableByteChannel
   (toBytes [this opts]

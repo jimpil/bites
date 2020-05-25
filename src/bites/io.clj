@@ -49,19 +49,26 @@
 
   ByteBuffer
   (make-reader [this opts]
-    (-> (proto/toBytes this nil)
+    (-> this
+        (proto/toBytes nil)
         (io/make-reader opts)))
   (make-writer [this opts]
-    (-> (io/make-output-stream this nil)
+    (-> this
+        (io/make-output-stream nil)
         (io/make-writer opts)))
   (make-input-stream [this opts]
-    (-> (proto/toBytes this nil)
+    (-> this
+        (proto/toBytes nil)
         (io/make-input-stream opts)))
   (make-output-stream [this _]
-    (let [bout    (ByteArrayOutputStream.)
-          channel (Channels/newChannel bout)]
-      (.write channel this)
-      bout))
+    (if (.hasArray this)
+      (let [arr (.array this)]
+        (doto (ByteArrayOutputStream. (alength arr))
+          (.write arr)))
+      (let [bout    (ByteArrayOutputStream.)
+            channel (Channels/newChannel bout)]
+        (.write channel this)
+        bout)))
 
   ReadableByteChannel
   (make-reader [this opts]

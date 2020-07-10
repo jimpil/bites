@@ -1,6 +1,9 @@
 (ns bites.util
-  (:require [clojure.string :as str])
-  (:import  [java.util Base64]))
+  (:require [clojure.string :as str]
+            [bites.constants :as constants])
+  (:import [java.util Base64 Arrays]
+           (java.nio ByteBuffer)
+           (java.nio.charset Charset CharsetEncoder)))
 
 (defn octal-bytes
   ^bytes [^String s]
@@ -96,7 +99,7 @@
        (map #(Integer/parseInt (str/join %) 2))
        byte-array))
 
-(defn unsigned
+(defn unsigned-int
   [x]
   (assert (<= x 255)
           "Integer value cannot be greater than 255")
@@ -108,4 +111,29 @@
 
 (defmacro current-thread-interrupted? []
   `(.isInterrupted (Thread/currentThread)))
+
+(defn copy-byte-array
+  ([^bytes bs]
+   (aclone bs))
+  ([^bytes bs from]
+   (copy-byte-array bs from (alength bs)))
+  ([^bytes bs from to]
+   (Arrays/copyOfRange bs (int from) (int to))))
+
+(defn concat-byte-arrays
+  ^bytes [& arrays]
+  (let [total-length (apply + (map #(alength ^bytes %) arrays))
+        buffer (reduce
+                 (fn [^ByteBuffer buff ^bytes arr]
+                   (.put buff arr))
+                 (ByteBuffer/allocate total-length)
+                 arrays)]
+    (.array buffer)))
+
+(defn charset-encoder
+  ^CharsetEncoder [opts]
+  (-> opts
+      (:encoding constants/UTF-8)
+      (Charset/forName)
+      .newEncoder))
 

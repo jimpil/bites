@@ -5,12 +5,12 @@
              [constants :as constants]
              [util :as ut]]
             [clojure.java.io :as io])
-  (:import (java.nio ByteBuffer ReadOnlyBufferException)
-           (java.nio.charset Charset)
+  (:import (java.nio ByteBuffer ReadOnlyBufferException ByteOrder CharBuffer)
+           (java.nio.charset Charset CharsetEncoder)
            (java.nio.channels FileChannel ReadableByteChannel Channels)
            (java.net URI URL)
            (java.io File InputStream ByteArrayOutputStream ObjectOutputStream Serializable ByteArrayInputStream ObjectInputStream FileInputStream)
-           (java.util UUID)
+           (java.util UUID Arrays)
            (javax.imageio ImageIO)
            (java.awt.image BufferedImage)))
 
@@ -107,24 +107,39 @@
       (.readObject oin))))
 
 ;;----------------------------------------------
-
+(defn- set-byte-order!
+  [^ByteBuffer bb bo]
+  (case bo
+    :be (.order bb ByteOrder/BIG_ENDIAN)
+    :le (.order bb ByteOrder/LITTLE_ENDIAN)
+    nil))
 
 (extend-protocol proto/ToByteArray
+  Short
+  (toBytes [this opts]
+    (let [bb (ByteBuffer/allocate Short/BYTES)]
+      (some->> opts :byte-order (set-byte-order! bb))
+      (.putShort bb this)
+      (.array bb)))
+
   Integer
-  (toBytes [this _]
+  (toBytes [this opts]
     (let [bb (ByteBuffer/allocate Integer/BYTES)]
+      (some->> opts :byte-order (set-byte-order! bb))
       (.putInt bb this)
       (.array bb)))
 
   Long
-  (toBytes [this _]
+  (toBytes [this opts]
     (let [bb (ByteBuffer/allocate Long/BYTES)]
+      (some->> opts :byte-order (set-byte-order! bb))
       (.putLong bb this)
       (.array bb)))
 
   Double
-  (toBytes [this _]
+  (toBytes [this opts]
     (let [bb (ByteBuffer/allocate Double/BYTES)]
+      (some->> opts :byte-order (set-byte-order! bb))
       (.putDouble bb this)
       (.array bb)))
 
@@ -148,12 +163,12 @@
     (.toByteArray this))
 
   String
-  (toBytes [this opts]
-    (if-let [enc (:encoding opts)]
-      (condp instance? enc
-        Charset (.getBytes this ^Charset enc)
-        String  (.getBytes this ^String  enc)
-        (base-encoded this enc (:b64-flavor opts)))
+  (toBytes [this {:keys [length-prefix encoding b64-flavor]}]
+    (if encoding
+      (condp instance? encoding
+        Charset (.getBytes this ^Charset encoding)
+        String  (.getBytes this ^String  encoding)
+        (base-encoded this encoding b64-flavor))
       (.getBytes this)))
 
   UUID
@@ -177,9 +192,12 @@
 
   FileChannel
   (toBytes [this opts]
-    (let [buf (ByteBuffer/allocate (int (.size this)))]
+    (let [length (.size this)
+          ^ByteBuffer buf (if (> length constants/MAX_ARRAY_SIZE)
+                            (throw (OutOfMemoryError. "Required array size too large!"))
+                            (ByteBuffer/allocate (int length)))]
       (.read this buf)
-      (proto/toBytes buf opts)))
+      (.array buf)))
 
   URL
   (toBytes [this opts]
@@ -212,6 +230,13 @@
             (io/make-output-stream nil)
             (proto/toBytes nil)))))
 
+  CharBuffer
+  (toBytes [this opts]
+    (-> opts
+        ut/charset-encoder
+        (.encode this)
+        .array))
+
   ReadableByteChannel
   (toBytes [this opts]
     (let [buffer-size (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
@@ -222,7 +247,7 @@
         (cond
           (> (count accum) constants/MAX_ARRAY_SIZE)
           ;; mimic `Files/readAllBytes` method
-          (throw (OutOfMemoryError. "Required array size too large"))
+          (throw (OutOfMemoryError. "Required array size too large!"))
           ;; EOS - return result
           (neg? nread)  (-> accum persistent! byte-array)
           ;; nothing was read - recur without touching anything
@@ -236,7 +261,7 @@
             (recur accum buffer (read! buffer)))))))
 
   Serializable ;; catch-all extension clause
-  (proto/toBytes [this opts]
+  (toBytes [this opts]
     (let [buffer (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
           out (ByteArrayOutputStream. buffer)]
       (with-open [oout (ObjectOutputStream. out)]
@@ -245,3 +270,14 @@
         (proto/toBytes out nil))))
 
   )
+
+(extend-protocol proto/ToByteArray
+  (Class/forName "[C")
+
+  (toBytes [this opts]
+    (-> (CharBuffer/wrap this)
+        (proto/toBytes opts))))
+
+(extend-protocol proto/ToByteArray
+  (Class/forName "[B")
+  (toBytes [this _] this))

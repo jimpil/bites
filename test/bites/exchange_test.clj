@@ -27,10 +27,9 @@
                    (deliver done? true))
                  ;(println (peek n))
                  ))
-    (time
-      (and @done?
-           (is (<= limit (.get id)))
-           (is (= @ret (mapv produce* (range 1 (inc (count @ret))))))))))
+    (and @done?
+         (is (<= limit (.get id)))
+         (is (= @ret (mapv produce* (range 1 (inc (count @ret)))))))))
 
 (deftest sync-exchange-test
   (do-exchange-test!

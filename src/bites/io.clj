@@ -4,7 +4,8 @@
   bites.io
   (:require [clojure.java.io :as io]
             [bites.protocols :as proto]
-            [bites.constants :as constants])
+            [bites.constants :as constants]
+            [bites.util :as ut])
   (:import (java.nio ByteBuffer CharBuffer)
            (java.nio.channels ReadableByteChannel Channels WritableByteChannel FileChannel Pipe)
            (java.io InputStream OutputStream Writer File FileOutputStream FileInputStream Reader ByteArrayOutputStream)
@@ -12,12 +13,6 @@
            (java.util Arrays)))
 
 (set! *warn-on-reflection* true)
-
-(defn- charset-encoder [opts]
-  (-> opts
-      (:encoding constants/DEFAULT_CHARSET)
-      (Charset/forName)
-      .newEncoder))
 
 (defmulti do-copy ;; io/do-copy is private :(
   (fn [input output opts]
@@ -72,13 +67,13 @@
 
   ReadableByteChannel
   (make-reader [this opts]
-    (Channels/newReader this ^String (:encoding opts constants/DEFAULT_CHARSET)))
+    (Channels/newReader this ^String (:encoding opts constants/UTF-8)))
   (make-input-stream [this opts]
     (Channels/newInputStream this))
 
   WritableByteChannel
   (make-writer [this opts]
-    (Channels/newWriter this ^String (:encoding opts constants/DEFAULT_CHARSET)))
+    (Channels/newWriter this ^String (:encoding opts constants/UTF-8)))
   (make-output-stream [this opts]
     (Channels/newOutputStream this))
 
@@ -116,7 +111,7 @@
 (defmethod do-copy [constants/CHAR-ARRAY-TYPE WritableByteChannel]
   [^chars in ^WritableByteChannel out opts]
   (let [^CharsetEncoder enc (or (:encoder opts)
-                                (charset-encoder opts))]
+                                (ut/charset-encoder opts))]
     (-> enc
         (.encode (CharBuffer/wrap in))
         (do-copy out opts))))
@@ -124,7 +119,7 @@
 (defmethod do-copy [Reader WritableByteChannel]
   [^Reader in ^WritableByteChannel out opts]
   (let [buf-size (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
-        encoder (charset-encoder opts)
+        encoder (ut/charset-encoder opts)
         opts (assoc opts :encoder encoder)
         buffer (char-array buf-size)]
     (loop [offset 0]

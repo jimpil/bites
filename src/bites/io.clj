@@ -3,8 +3,8 @@
     :doc "This file extends the polymorphic I/O utility functions already present in Clojure to ByteBuffer/ReadableByteChannel/WritableByteChannel."}
   bites.io
   (:require [clojure.java.io :as io]
-            [bites.protocols :as proto]
-            [bites.constants :as constants]
+            [bites.constants :as const]
+            [bites.array :as array]
             [bites.util :as ut])
   (:import (java.nio ByteBuffer CharBuffer)
            (java.nio.channels ReadableByteChannel Channels WritableByteChannel FileChannel Pipe)
@@ -45,7 +45,7 @@
   ByteBuffer
   (make-reader [this opts]
     (-> this
-        (proto/toBytes nil)
+        (array/toBytes nil)
         (io/make-reader opts)))
   (make-writer [this opts]
     (-> this
@@ -53,7 +53,7 @@
         (io/make-writer opts)))
   (make-input-stream [this opts]
     (-> this
-        (proto/toBytes nil)
+        (array/toBytes nil)
         (io/make-input-stream opts)))
   (make-output-stream [this _]
     (if (.hasArray this)
@@ -67,13 +67,13 @@
 
   ReadableByteChannel
   (make-reader [this opts]
-    (Channels/newReader this ^String (:encoding opts constants/UTF-8)))
+    (Channels/newReader this ^String (:encoding opts const/UTF-8)))
   (make-input-stream [this opts]
     (Channels/newInputStream this))
 
   WritableByteChannel
   (make-writer [this opts]
-    (Channels/newWriter this ^String (:encoding opts constants/UTF-8)))
+    (Channels/newWriter this ^String (:encoding opts const/UTF-8)))
   (make-output-stream [this opts]
     (Channels/newOutputStream this))
 
@@ -82,17 +82,17 @@
 ;; ByteBuffer => OutputStream, Writer, File, WritableByteChannel
 (defmethod do-copy [ByteBuffer OutputStream]
   [^ByteBuffer in out opts]
-  (-> (proto/toBytes in nil)
+  (-> (array/toBytes in nil)
       (do-copy out opts)))
 
 (defmethod do-copy [ByteBuffer Writer]
   [^ByteBuffer in out opts]
-  (-> (proto/toBytes in nil)
+  (-> (array/toBytes in nil)
       (do-copy out opts)))
 
 (defmethod do-copy [ByteBuffer File]
   [^ByteBuffer in out opts]
-  (-> (proto/toBytes in nil)
+  (-> (array/toBytes in nil)
       (do-copy out opts)))
 
 (defmethod do-copy [ByteBuffer WritableByteChannel]
@@ -104,11 +104,11 @@
 
 (defmethod do-copy [String WritableByteChannel]
   [^String in ^WritableByteChannel out opts]
-  (-> (proto/toBytes in opts)
+  (-> (array/toBytes in opts)
       (ByteBuffer/wrap)
       (do-copy out opts)))
 
-(defmethod do-copy [constants/CHAR-ARRAY-TYPE WritableByteChannel]
+(defmethod do-copy [const/CHAR-ARRAY-TYPE WritableByteChannel]
   [^chars in ^WritableByteChannel out opts]
   (let [^CharsetEncoder enc (or (:encoder opts)
                                 (ut/charset-encoder opts))]
@@ -118,7 +118,7 @@
 
 (defmethod do-copy [Reader WritableByteChannel]
   [^Reader in ^WritableByteChannel out opts]
-  (let [buf-size (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
+  (let [buf-size (:buffer-size opts const/DEFAULT_BUFFER_SIZE)
         encoder (ut/charset-encoder opts)
         opts (assoc opts :encoder encoder)
         buffer (char-array buf-size)]
@@ -138,7 +138,7 @@
                 (recur leftover))
               (recur 0))))))))
 
-(defmethod do-copy [constants/BYTE-ARRAY-TYPE WritableByteChannel]
+(defmethod do-copy [const/BYTE-ARRAY-TYPE WritableByteChannel]
   [in ^WritableByteChannel out opts]
   (-> (ByteBuffer/wrap in)
       (do-copy out opts)))
@@ -156,7 +156,8 @@
 
 (defmethod do-copy [InputStream WritableByteChannel]
   [^InputStream in ^WritableByteChannel out opts]
-  (do-copy (Channels/newChannel in) out opts))
+  (-> (Channels/newChannel in)
+      (do-copy out opts)))
 
 ;; ReadableByteChannel =>  Writer (via InputStream)
 (defmethod do-copy [ReadableByteChannel Writer]
@@ -183,13 +184,7 @@
 ;; ReadableByteChannel =>  WritableByteChannel (base case)
 (defmethod do-copy [ReadableByteChannel WritableByteChannel]
   [^ReadableByteChannel in ^WritableByteChannel out opts]
-  (let [buffer (ByteBuffer/allocate
-                 (:buffer-size opts constants/DEFAULT_BUFFER_SIZE))]
-    ;; per the Java docs
-    (while (not (neg? (.read in buffer)))
-      (.flip buffer)
-      (.write out buffer)
-      (.compact buffer))))
+  (ut/transfer! in out opts))
 
 (defn into-pipe!
   "Writes <x> into this Pipe's sink-channel.

@@ -3,7 +3,6 @@
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :refer [defspec]]
-            [bites.protocols :as proto]
             [bites.array :refer :all]
             [bites.util :as ut])
   (:import (java.nio.charset StandardCharsets)
@@ -16,8 +15,8 @@
    and checks that classes match - returns nil if they don't."
   [obj opts]
   (let [obj-class (class obj)
-        obj-bytes (proto/toBytes obj opts)
-        round-tripped (proto/fromBytes obj-class obj-bytes opts)
+        obj-bytes (toBytes obj opts)
+        round-tripped (fromBytes obj-class obj-bytes opts)
         round-tripped-class (class round-tripped)]
     (if (= obj-class round-tripped-class)
       round-tripped
@@ -99,6 +98,6 @@
 
 (defspec gen-byte-channel default-runs
   (prop/for-all [^bytes v gen/bytes]
-    (let [rbc       (proto/fromBytes ReadableByteChannel v nil)
-          rbc-bytes (proto/toBytes rbc {:buffer-size 16})]
+    (let [rbc       (fromBytes ReadableByteChannel v nil)
+          rbc-bytes (toBytes rbc {:buffer-size 16})]
       (Arrays/equals v rbc-bytes))))

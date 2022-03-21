@@ -1,5 +1,7 @@
 (ns bites.core
-  (:require [bites.protocols :as proto]))
+  (:require [bites.array :as array]
+            [bites.cbor :as cbor]
+            [bites.length-prefix :as prefix]))
 
 ;(set! *warn-on-reflection* true)
 
@@ -10,16 +12,47 @@
   (^bytes [x]
    (to-bytes x nil))
   (^bytes [x opts]
-   (proto/toBytes x opts)))
+   (array/toBytes x opts)))
+
+(defn to-cbor-bytes
+  "Wrapper fn around `array/toBytes` protocol.
+   Turns object <x> into a CBOR-encoded byte-array (per applicable <opts>).
+   Does not close any input-streams other than the one(s) internally
+   created (i.e. if <x> is one it will NOT be closed)."
+  (^bytes [x]
+   (to-cbor-bytes x nil))
+  (^bytes [x opts]
+   (cbor/to-bytes x opts)))
 
 (defn from-bytes
   "Wrapper around `fromBytes` multi-method.
+   Turns byte-array <x> into an object.
    Requires type-hinting at the call-site.
    See `def-from` for defining type-hinted variants."
   ([klass x]
    (from-bytes klass x nil))
   ([klass x opts]
-   (proto/fromBytes klass x opts)))
+   (array/fromBytes klass x opts)))
+
+(defn from-cbor-bytes
+  "Wrapper around `cbor/fromCBOR` protocol.
+   Turns <x> (byte-array/ByteBuffer/InputStream/File)
+   into an object."
+  ([x]
+   (from-cbor-bytes x nil))
+  ([x opts]
+   (cbor/read-cbor x opts)))
+
+(defn with-length-prefix
+  "Returns a new byte-array whose N (depends on <encoding>) first bytes
+   denote the length of the provided bytes <bs>. `:int16` (2-byte),
+   `:int32` (4-byte) & `:int64` (8-byte) encodings are supported."
+  ^bytes [encoding byte-order bs]
+  (let [bytes-in? (bytes? bs)
+        length (if bytes-in? (alength ^bytes bs) (count bs))
+        length-bs (prefix/encode-length length [encoding byte-order])]
+    (cond-> (concat length-bs bs)
+            bytes-in? byte-array)))
 
 (defmacro def-from
   "Defines a type-hinted (per <klass>) function named <sym> taking 1 or 2 args,

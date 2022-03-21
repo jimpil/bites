@@ -1,10 +1,12 @@
 (ns bites.encoding
   (:require [clojure.string :as str]
-            [bites.protocols :as proto]
-            [bites.padding]))
+            [bites.constants :as const]
+            [bites.padding :as padding]))
+;; (U)BYTE
+(def ubyte? #(< -1 % const/MAX_UNSIGNED_BYTE))
 
-(defn signed->unsigned
-  "Get the unsigned value of byte <b> by casting to int and bit-anding with 0xFF.
+(defn byte->ubyte
+  "Get the unsigned value of byte <b>.
    ----------------------
    byte   -> unsigned-int
    ----------------------
@@ -13,11 +15,13 @@
    -1     -> 255
    ----------------------
    NOTE: Java doesn't support unsigned bytes so int must be used to get an unsigned byte"
-  ^long [b]
-  (bit-and (int b) 0xFF))
+  [x]
+  (cond-> x
+          (neg? x)
+          Byte/toUnsignedInt))
 
-(defn unsigned->signed
-  "Get the signed byte value of an unsigned int <x> by subtracting 256 if it is greater than 127.
+(defn ubyte->byte
+  "Get the signed byte value of an unsigned int <x>.
    -----------------
    int  -> byte
    -----------------
@@ -27,8 +31,68 @@
    255  -> -1
    -129 -> Exception
    -----------------"
+  [b]
+  (byte
+    (cond-> b
+            (> b Byte/MAX_VALUE)
+            (- const/MAX_UNSIGNED_BYTE))))
+
+;; (U)SHORT
+(def ushort? #(< -1 % const/MAX_UNSIGNED_SHORT))
+
+(defn short->ushort
   [x]
-  (byte (if (> x 127) (- x 256) x)))
+  (cond-> x
+          (neg? x)
+          Short/toUnsignedInt))
+
+(defn ushort->short
+  [x]
+  (short
+    (cond-> x
+            (> x Short/MAX_VALUE)
+            (- const/MAX_UNSIGNED_SHORT))))
+
+;; (U)INT
+(def uint? #(< -1 % const/MAX_UNSIGNED_INT))
+
+(defn parse-uint
+  [^String x]
+  (Integer/parseUnsignedInt x))
+
+(defn int->uint
+  ^long [x]
+  (cond-> x
+          (neg? x)
+          Integer/toUnsignedLong))
+
+(defn uint->int
+  [x]
+  (int
+    (cond-> x
+            (> x Integer/MAX_VALUE)
+            (- const/MAX_UNSIGNED_INT))))
+
+;; (U)LONG
+(def ulong? #(< -1 % const/MAX_UNSIGNED_LONG))
+
+(defn parse-ulong
+  ^long [^String x]
+  (Long/parseUnsignedLong x))
+
+(defn long->ulong
+  ^BigInteger [x]
+  (cond-> x
+          (neg? x)
+          (-> Long/toUnsignedString BigInteger.)))
+
+(defn ulong->long
+  ^long [x]
+  (long
+    (cond-> x
+            (> x Long/MAX_VALUE)
+            (- const/MAX_UNSIGNED_LONG))))
+;;----------------------------------------
 
 (defn nibble->char
   [nibble radix]
@@ -106,8 +170,8 @@
   ([s]
    (str->nibbles s 10))
   ([s radix]
-   (when (seq s)
-     (mapv #(char->digit % radix) s))))
+   (some->> (not-empty s)
+            (mapv #(char->digit % radix) s))))
 
 
 (defn byte->binary-str
@@ -120,9 +184,9 @@
    --------------------------"
   [b]
   (some-> b
-          signed->unsigned
+          byte->ubyte
           (Integer/toBinaryString)
-          (proto/left-pad \0 8)))
+          (padding/left-pad \0 8)))
 
 (defn byte->bitset*
   "Creates a bitset from byte <b>
@@ -133,21 +197,21 @@
    2r01101101 -> [0 1 1 0 1 1 0 1]
    ---------------------------------"
   [b]
-  (some-> b
-          byte->binary-str
-          (map #(Integer/parseInt (str %) 2))))
+  (some->> b
+           byte->binary-str
+           (mapv #(Integer/parseInt (str %) 2))))
 
 
-(defonce bitsets
-  (->> 256 range (mapv (comp byte->bitset* unsigned->signed))))
+(def bitsets ;; has to be a vector so it can be used as a function
+  (mapv byte->bitset* (range 256)))
 
-(defonce byte->bitset
-  (comp bitsets signed->unsigned))
+(def byte->bitset
+  (comp bitsets byte->ubyte))
 
-(defonce bitset->byte
+(def bitset->byte
   (->> 256
        range
-       (map (comp (juxt byte->bitset identity) unsigned->signed)) ;; [(byte->bitset byte) byte]
+       (map (juxt byte->bitset identity)) ;; [(byte->bitset byte) byte]
        (into {})))
 
 (defn bytes->bitset

@@ -1,18 +1,24 @@
 (ns bites.padding
-  (:require [bites.protocols :as p]
-            [bites.util :as ut]
-            [bites.array]))
+  (:require [bites.util :as ut]
+            [bites.array :as array]))
+
+(defprotocol Paddable
+  (left-pad [this pad]
+    [this pad length])
+  (left-unpad [this pad])
+  (right-pad [this pad]
+    [this pad length])
+  (right-unpad [this pad]))
 
 (defn- with-padding-values
   [side ^bytes this pad]
-  (let [pad-val (p/toBytes pad nil)]
+  (let [pad-val (array/toBytes pad nil)]
     (case side
       :left  (ut/concat-byte-arrays pad-val this)
       :right (ut/concat-byte-arrays this pad-val))))
 
 (defn- with-target-length
   [side ^bytes this pad target]
-  (assert (<= -128 pad 127))
   (let [have (alength this)
         need (- target have)]
     (if (pos? need)
@@ -22,7 +28,7 @@
            (with-padding-values side this))
       this)))
 
-(extend-protocol p/Paddable
+(extend-protocol Paddable
   (Class/forName "[B")
 
   (left-pad
@@ -38,12 +44,12 @@
      (with-target-length :right this pad target)))
 
   (left-unpad [^bytes this pad]
-    (let [^bytes pad-bs (p/toBytes pad nil)]
+    (let [^bytes pad-bs (array/toBytes pad nil)]
       (byte-array (drop (alength pad-bs) this))))
 
   (right-unpad [^bytes this pad]
-    (let [^bytes pad-bs (p/toBytes pad nil)
-          n (- (alength this)
+    (let [^bytes pad-bs (array/toBytes pad nil)
+          n (- (alength ^bytes this)
                (alength pad-bs))]
       (byte-array (take n this))))
 

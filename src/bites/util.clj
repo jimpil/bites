@@ -1,9 +1,12 @@
 (ns bites.util
   (:require [clojure.string :as str]
-            [bites.constants :as constants])
+            [bites.constants :as const])
   (:import [java.util Base64 Arrays]
            (java.nio ByteBuffer)
-           (java.nio.charset Charset CharsetEncoder)))
+           (java.nio.charset Charset CharsetEncoder)
+           (clojure.lang IReduceInit)
+           (java.nio.channels ReadableByteChannel WritableByteChannel)
+           (java.lang.reflect Field Modifier Constructor)))
 
 (defn octal-bytes
   ^bytes [^String s]
@@ -43,39 +46,44 @@
      (-> (Base64/getDecoder)
          (.decode s)))))
 ;;======================================
+(defn byte->hex
+  "Convert a single byte value to a two-character hex string."
+  [b]
+  (let [hex (Integer/toHexString
+              (if (neg? b)
+                (+ b const/MAX_UNSIGNED_BYTE)
+                b))]
+    (cond->> hex
+             (= 1 (count hex))
+             (str \0))))
+
+(defn hex->byte
+  "Convert a two-character hex string to a byte value."
+  [octet]
+  (let [b (Integer/parseInt octet 16)]
+    (cond-> b
+            (> b 127)
+            (- const/MAX_UNSIGNED_BYTE))))
+
 (defn b16-str
   "Encodes the provided byte-array <bs> in Base16 (i.e. hex).
    Returns String."
   (^String [bs]
    (b16-str bs :lower))
   (^String [^bytes bs char-case]
-   (let [fmt (str "%0"
-                  (bit-shift-left (alength bs) 1)
-                  (case char-case
-                    :upper \X
-                    :lower \x))]
-     (format fmt (BigInteger. 1 bs)))))
+   (cond-> (apply str (map byte->hex bs))
+           (= :upper char-case) str/upper-case)))
 
 (defn b16-bytes
   "Decodes the provided String <bs> from Base16 (i.e. hex).
    Returns byte-array."
   ^bytes [^String s]
-  (let [bs (.toByteArray (BigInteger. s 16))
-        bs-len (alength bs)
-        proper-len (bit-shift-right (.length s) 1)]
-    (cond
-      (= bs-len proper-len)
-      bs
-
-      (> proper-len bs-len)
-      (let [padding (- proper-len bs-len)
-            ret (byte-array (+ padding bs-len)
-                            (repeat padding (byte 0)))]
-        (System/arraycopy bs 0 ret padding bs-len)
-        ret)
-
-      :else
-      (byte-array (next bs)))))
+  (let [length (/ (count s) 2)
+        data (byte-array length)]
+    (dotimes [i length]
+      (let [octet (subs s (* 2 i) (* 2 (inc i)))]
+        (aset-byte data i (hex->byte octet))))
+    data))
 ;;=======================================
 
 (defn binary-str
@@ -99,16 +107,6 @@
        (map #(Integer/parseInt (str/join %) 2))
        byte-array))
 
-(defn unsigned-int
-  [x]
-  (assert (<= x 255)
-          "Integer value cannot be greater than 255")
-  (assert (>= x 0)
-          "Integer value cannot be less than 0")
-  (if (> x 127)
-    (byte (bit-or -128 (- x 128)))
-    (byte x)))
-
 (defmacro current-thread-interrupted? []
   `(.isInterrupted (Thread/currentThread)))
 
@@ -123,17 +121,162 @@
 (defn concat-byte-arrays
   ^bytes [& arrays]
   (let [total-length (apply + (map #(alength ^bytes %) arrays))
-        buffer (reduce
-                 (fn [^ByteBuffer buff ^bytes arr]
-                   (.put buff arr))
-                 (ByteBuffer/allocate total-length)
-                 arrays)]
+        ^ByteBuffer buffer (reduce
+                             (fn [^ByteBuffer buff ^bytes arr]
+                               (.put buff arr))
+                             (ByteBuffer/allocate total-length)
+                             arrays)]
     (.array buffer)))
 
 (defn charset-encoder
   ^CharsetEncoder [opts]
   (-> opts
-      (:encoding constants/UTF-8)
+      (:encoding const/UTF-8)
       (Charset/forName)
       .newEncoder))
 
+(def not-neg? (complement neg?))
+
+(defn update!
+  ([m k f]
+   (assoc! m k (f (get m k))))
+  ([m k f arg1]
+   (assoc! m k (f (get m k) arg1)))
+  ([m k f arg1 arg2]
+   (assoc! m k (f (get m k) arg1 arg2)))
+  ([m k f arg1 arg2 arg3]
+   (assoc! m k (f (get m k) arg1 arg2 arg3)))
+  ([m k f arg1 arg2 arg3 & args]
+   (assoc! m k (apply f (get m k) arg1 arg2 arg3 args))))
+
+(defn map-vals
+  "Transforms the values of map <m>,
+   passing each one through the provided function."
+  [f m]
+  (persistent!
+    (reduce-kv
+      #(assoc! %1 %2 (f %3))
+      (transient {}) m)))
+
+(defn reverse-bytes
+  (^bytes [array]
+   (reverse-bytes array 0))
+  (^bytes [^bytes array start-idx]
+   (let [l (alength array)
+         start-idx (int start-idx)]
+     (loop [i (unchecked-subtract-int l (unchecked-inc-int start-idx))
+            j (int start-idx)
+            a (byte-array (unchecked-subtract-int l j))]
+       (if (= j l)
+         a
+         (recur (unchecked-dec-int i)
+                (unchecked-inc-int j)
+                (doto a (aset i (aget array j)))))))))
+
+(defn string-bytes
+  [^String encoding ^String s]
+  (.getBytes s encoding))
+
+(defn reducible-range
+  ([]
+   (reify IReduceInit
+     (reduce [_ f init]
+       (loop [result init
+              i (long 0)]
+         (if (reduced? result)
+           @result
+           (recur (f result i) (unchecked-inc i)))))))
+  ([end]
+   (reducible-range 0 end))
+  ([start end]
+   (reducible-range start end 1))
+  ([start end ^long step]
+   (reify IReduceInit
+     (reduce [_ f init]
+       (loop [result init,
+              i (long start)]
+         (if (= i end)
+           @(ensure-reduced result)
+           (recur (f result i) (unchecked-add i step))))))))
+
+(defn strict-map
+  [m lenient?]
+  (fn [k]
+    (if-some [value (m k)]
+      value
+      (if lenient?
+        k
+        (throw
+          (ex-info (str "Unknown enum key: " k)
+                   {:enum m :key k}))))))
+
+(defn transfer!
+  ([in out]
+   (transfer! in out nil))
+  ([^ReadableByteChannel in ^WritableByteChannel out opts]
+   (let [buff (ByteBuffer/allocate (:buffer-size opts const/DEFAULT_BUFFER_SIZE))]
+     ;; per the Java docs
+     (while (not-neg? (.read in buff))
+       (.flip buff)
+       (.write out buff)
+       (.compact buff)))))
+
+(defn rand-long
+  ([minimum maximum]
+   (+ minimum (rand-long maximum)))
+  ([maximum]
+   (long (rand maximum))))
+
+(defn name++
+  "Like `clojure.core/name`, but takes into account the namespace."
+  [x]
+  (if (string? x)
+    x
+    (if-some [ns-x (namespace x)]
+      (str ns-x \/ (name x))
+      (name x))))
+
+(defn get-class-fields
+  [^Class klass]
+  (->> (.getDeclaredFields klass)
+       (remove (fn [^Field x]
+                 (Modifier/isStatic (.getModifiers x))))))
+
+(defn find-best-ctors
+  [^Class klass args]
+  (let [keym {:boolean Boolean/TYPE
+              :byte    Byte/TYPE
+              :double  Double/TYPE
+              :float   Float/TYPE
+              :int     Integer/TYPE
+              :long    Long/TYPE
+              :short   Short/TYPE}
+        args (->> args
+                  (map #(if (class? %) % (keyword %)))
+                  (map #(keym % %)))
+        prims (map keym [:boolean :byte :double :float :int :long :short])
+        boxed [Boolean Byte Double Float Integer Long Short]
+        convm (zipmap (concat prims boxed) (concat boxed prims))
+        ctors (->> (.getConstructors klass)
+                   (filter #(== (count args) (count (.getParameterTypes ^Constructor %))))
+                   (filter #(every? (fn [[^Class pt a]]
+                                      (or (.isAssignableFrom pt a)
+                                          (if-let [^Class pt* (convm pt)]
+                                            (.isAssignableFrom pt* a))))
+                                    (zipmap (.getParameterTypes ^Constructor %) args))))]
+    (when (seq ctors)
+      (let [count-steps (fn count-steps [pt a]
+                          (loop [ks #{a} cnt 0]
+                            (if (or (ks pt) (ks (convm pt)))
+                              cnt
+                              (recur (set (mapcat parents ks)) (inc cnt)))))
+            steps (map (fn [^Constructor ctor]
+                         (map count-steps (.getParameterTypes ctor) args))
+                       ctors)
+            m (zipmap steps ctors)
+            min-steps (->> steps
+                           (apply min-key (partial apply max))
+                           (apply max))]
+        (->> m
+             (filter (comp #{min-steps} (partial apply max) key))
+             vals)))))

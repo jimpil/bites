@@ -29,7 +29,7 @@
         (util/update! 0 persistent!)
         persistent!)))
 
-(defn- sum-writes
+(defn sum-writes
   [codec out vs]
   (transduce (map #(bin-write codec out %)) + 0 vs))
 
@@ -143,7 +143,8 @@
             (bin-read in)
             (update 0 post-decode)))
       (bin-write [_ out v]
-        (bin-write codec out (pre-encode v)))
+        (->> (pre-encode v)
+             (bin-write codec out)))
       Object
       (toString [_]
         (str "<BinaryCodec wrapped, inner=" codec ">")))))

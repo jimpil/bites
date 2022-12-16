@@ -30,8 +30,8 @@
         persistent!)))
 
 (defn sum-writes
-  [codec out vs]
-  (transduce (map #(bin-write codec out %)) + 0 vs))
+  ^long [codec out vs]
+  (transduce (map #(bin-write codec out %)) + vs))
 
 (defn primitive*
   "Create a reification of `BinaryCodec` that can read/write a primmitive data type."
@@ -225,8 +225,8 @@
         vs (instances (take-nth 2 (next kvs)))
         key-order (into {} (map-indexed #(vector %2 %) ks))
         internal-map (apply sorted-map-by
-                            (comparator #(< (key-order % Long/MAX_VALUE)
-                                            (key-order %2 Long/MAX_VALUE)))
+                            (comparator #(< ^long (key-order % Long/MAX_VALUE)
+                                            ^long (key-order %2 Long/MAX_VALUE)))
                             kvs)]
     (reify
       BinaryCodec
@@ -306,7 +306,7 @@
   "Read until the read value equals `sep` (excluding it)."
   [codec in sep]
   (eduction
-    (map (fn [i]
+    (map (fn [^long i]
            (try (bin-read codec in)
                 (catch BufferUnderflowException e
                   (if (zero? i)
@@ -353,7 +353,7 @@ Example: To read a sequence of integers with a byte prefix for the length use `(
             (sum-reads (partial read-to-separator codec in separator)))
           (bin-write [_ out vs]
             (let [n (sum-writes codec out vs)]
-              (+ n (channel/write-byte out separator))))
+              (+ n ^long (channel/write-byte out separator))))
           Object
           (toString [_]
             (str "<BinaryCodec repeated,separator=" separator ">"))))
@@ -362,14 +362,14 @@ Example: To read a sequence of integers with a byte prefix for the length use `(
       (let [prefix-codec (instance length-prefix)]
         (reify BinaryCodec
           (bin-read  [_ in]
-            (let [[length nread1] (bin-read prefix-codec in)
-                  [ret nread2] (if (some-> length pos?)
-                                 (sum-reads (partial read-n codec in length))
-                                 (sum-reads (partial read-all-valid codec in)))]
+            (let [[length ^long nread1] (bin-read prefix-codec in)
+                  [ret ^long nread2] (if (some-> length pos-int?)
+                                       (sum-reads (partial read-n codec in length))
+                                       (sum-reads (partial read-all-valid codec in)))]
               [ret (+ nread1 nread2)]))
           (bin-write [_ out vs]
             (let [written (bin-write prefix-codec out (count vs))]
-              (+ written (sum-writes codec out vs))))
+              (+ ^long written (sum-writes codec out vs))))
           Object
           (toString [_]
             (str "<BinaryCodec repeated,length-prefix=" prefix-codec ">"))))
@@ -406,13 +406,13 @@ Example: To read a sequence of integers with a byte prefix for the length use `(
     (let [prefix-codec (instance length-prefix)]
       (reify BinaryCodec
         (bin-read  [_ in]
-          (let [[length nread1] (bin-read prefix-codec in)
-                [ret nread2] (read-nbytes in length)]
+          (let [[length ^long nread1] (bin-read prefix-codec in)
+                [ret ^long nread2] (read-nbytes in length)]
             [ret (+ nread1 nread2)]))
         (bin-write [_ out vs]
           (let [length (alength ^bytes vs)]
-            (+ (bin-write prefix-codec out length)
-               (channel/write-from-buffer out (ByteBuffer/wrap vs)))))
+            (+ ^long (bin-write prefix-codec out length)
+               ^long (channel/write-from-buffer out (ByteBuffer/wrap vs)))))
         Object
         (toString [_]
           (str "<BinaryCodec blob,prefix=" prefix-codec ">"))))
@@ -465,13 +465,13 @@ Example:
   [^String encoding]
   (string encoding :separator (byte 0)))
 
-(defn- bit-set? [bytes-vec idx]
-  (not (zero? (bit-and (bytes-vec (- (count bytes-vec) 1 (quot idx 8)))
-                       (bit-shift-left 1 (mod idx 8))))))
-(defn- set-bit [bytes idx]
+(defn- bit-set? [bytes-vec ^long idx]
+  (not (zero? (bit-and ^byte (bytes-vec (- (count bytes-vec) 1 (long (quot idx 8))))
+                       (bit-shift-left 1 (long (mod idx 8)))))))
+(defn- set-bit [bytes ^long idx]
   (update-in bytes
-             [(- (count bytes) 1 (quot idx 8))]
-             #(enc/ubyte->byte (bit-or % (bit-shift-left 1 (mod idx 8))))))
+             [(- (count bytes) 1 (long (quot idx 8)))]
+             #(byte (bit-or ^int % (bit-shift-left 1 (long (mod idx 8)))))))
 
 (defn bits
   "`flags` is a sequence of flag names. Each flag's index corresponds to the bit with that index.
@@ -479,14 +479,20 @@ Flag names `null` are ignored. Bit count will be padded up to the next multiple 
   [flags]
   (let [byte-count (int (Math/ceil (/ (count flags) 8)))
         idx->flags (into {} (keep-indexed #(when %2 [%1 %2])) flags)
-        flags->idx (into {} (keep-indexed #(when %2 [%2 %1])) flags)
+        flags->idx (zipmap (vals idx->flags) (keys idx->flags))
         bit-indices (sort (keys idx->flags))]
     (-> (repeated :byte :length byte-count)
         (wrap
-          (fn [flags] (reduce set-bit
-                              (vec (repeat byte-count (byte 0)))
-                              (vals (select-keys flags->idx flags))))
-          (fn [bs] (set (map idx->flags (filter (partial bit-set? bs) bit-indices))))))))
+          (fn [flags]
+            (reduce set-bit
+                    (vec (repeat byte-count (byte 0)))
+                    (vals (select-keys flags->idx flags))))
+          (fn [bs]
+            (into #{}
+              (comp
+                (filter (partial bit-set? bs))
+                (map idx->flags))
+              bit-indices))))))
 
 (defn header
   "Decodes a header using `header-codec`. Passes this datastructure to `header->body-codec` which returns the codec to
@@ -499,9 +505,9 @@ else only the `body` will be returned."
   (let [header-codec (instance header-codec)]
     (reify BinaryCodec
       (bin-read [_ in]
-        (let [[header n1] (bin-read header-codec in)
-              body-codec  (header->body-codec header)
-              [body n2]   (bin-read body-codec in)
+        (let [[header ^long n1] (bin-read header-codec in)
+              body-codec        (header->body-codec header)
+              [body ^long n2]   (bin-read body-codec in)
               ret (if with-header?
                     {:body body :header header}
                     body)]
@@ -517,7 +523,7 @@ else only the `body` will be returned."
               body-codec (header->body-codec header)
               n1 (bin-write header-codec out header)
               n2 (bin-write body-codec out body)]
-          (+ n1 n2)))
+          (+ ^long n1 ^long n2)))
       Object
       (toString [_]
         (str "<BinaryCodec header,codec=" header-codec ">")))))
@@ -535,7 +541,7 @@ Example:
     (encode (padding (repeated (string \"UTF8\" :separator 0)) :length 11 :truncate? true) outstream [\"abc\" \"def\" \"ghi\"])
     => ; writes bytes [97 98 99 0 100 101 102 0 103 104 105]
        ; observe: the last separator byte was truncated!"
-  [inner-codec & {:keys [length
+  [inner-codec & {:keys [^long length
                          padding-byte
                          truncate?]
                   :or {padding-byte 0}
@@ -552,7 +558,7 @@ Example:
       (bin-write [_ out v]
         (let [baos (ByteArrayOutputStream. length)
               inner-out (channel/output baos)
-              written (bin-write inner-codec inner-out v)
+              written (long (bin-write inner-codec inner-out v))
               target-length (cond->> written truncate? (min length))
               padding-bytes-left (max 0 (- length target-length))
               diff (- written length)
@@ -593,7 +599,7 @@ Parameters:
 Example:
     (encode (align (repeated :short-be :length 3) :modulo 9 :padding-byte 55) [1 2 3] output-stream)
     ;==> writes these bytes: [0 1 0 2 0 3 55 55 55]"
-  [inner-codec & {:keys [modulo
+  [inner-codec & {:keys [^long modulo
                          padding-byte]
                   :or {padding-byte 0
                        modulo 1}
@@ -605,8 +611,8 @@ Example:
   (let [inner-codec (instance inner-codec)]
     (reify BinaryCodec
       (bin-read  [_ in]
-        (let [[v nread] (bin-read inner-codec in)
-              padding-bytes-left (mod (- modulo (mod nread modulo)) modulo)
+        (let [[v ^long nread] (bin-read inner-codec in)
+              padding-bytes-left (long (mod (- modulo ^long (mod nread modulo)) modulo))
               aligned  (if (pos? padding-bytes-left)
                          (->> (buffer/byte-buffer padding-bytes-left)
                               (channel/read-into-buffer in))
@@ -614,14 +620,14 @@ Example:
           [v (+ nread aligned)]))
       (bin-write [_ out v]
         (let [written (bin-write inner-codec out v)
-              padding-bytes-left (mod (- modulo (mod written modulo)) modulo)
+              padding-bytes-left (long (mod (- modulo ^long (mod written modulo)) modulo))
               aligned (if (pos? padding-bytes-left)
                         (->> (enc/ubyte->byte padding-byte)
                              (byte-array padding-bytes-left)
                              ByteBuffer/wrap
                              (channel/write-from-buffer out))
                         0)]
-          (+ written aligned)))
+          (+ ^long written aligned)))
       Object
       (toString [_]
         (str "<BinaryCodec aligned, options=" opts ">")))))

@@ -10,11 +10,17 @@
     :le (.order bb ByteOrder/LITTLE_ENDIAN)
     bb))
 
-(defn byte-buffer
-  (^ByteBuffer [n] (byte-buffer n nil))
-  (^ByteBuffer [^long n endianess]
+(defn ^ByteBuffer byte-buffer
+  ([n] (byte-buffer n nil))
+  ([^long n endianess]
    (-> (ByteBuffer/allocate n)
        (set-byte-order! endianess))))
+
+(defn ^ByteBuffer wrap
+  ([^bytes bs] (wrap bs nil))
+  ([^bytes bs endianess]
+   (-> (-> (ByteBuffer/wrap bs)
+           (set-byte-order! endianess)))))
 
 (defn read-byte   [^ByteBuffer b] (.get b))
 (defn read-short  [^ByteBuffer b] (.getShort b))

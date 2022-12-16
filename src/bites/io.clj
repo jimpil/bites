@@ -118,7 +118,7 @@
 
 (defmethod do-copy [Reader WritableByteChannel]
   [^Reader in ^WritableByteChannel out opts]
-  (let [buf-size (:buffer-size opts const/DEFAULT_BUFFER_SIZE)
+  (let [^long buf-size (:buffer-size opts const/DEFAULT_BUFFER_SIZE)
         encoder (ut/charset-encoder opts)
         opts (assoc opts :encoder encoder)
         buffer (char-array buf-size)]
@@ -126,10 +126,10 @@
       (let [nread (.read in buffer offset buf-size)]
         ;(println "Read:" nread)
         (when-not (neg? nread)
-          (let [written (cond-> buffer
-                                (> buf-size nread)
-                                (Arrays/copyOfRange 0 nread)
-                                true (do-copy out opts))
+          (let [^long written (cond-> buffer
+                                      (> buf-size nread)
+                                      (Arrays/copyOfRange 0 nread)
+                                      true (do-copy out opts))
                 leftover (long (- nread written))]
             ;(println "Written:" written)
             (if (pos? leftover)

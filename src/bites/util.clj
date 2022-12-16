@@ -8,13 +8,23 @@
            (java.nio.channels ReadableByteChannel WritableByteChannel)
            (java.lang.reflect Field Modifier Constructor)))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+
+(defn str!
+  ([]                    (StringBuilder.)) ;; init
+  ([^StringBuilder sb]   (.toString sb))   ;; complete
+  ([^StringBuilder sb x] (.append sb x)))  ;; accumulate
+
 (defn octal-bytes
   ^bytes [^String s]
+  {:pre [(false? (.isEmpty s))]}
   (let [bi (BigInteger. s 8)]
     (.toByteArray bi)))
 
 (defn octal-str
   ^String [^bytes bs]
+  {:pre [(pos? (alength bs))]}
   (let [bi (BigInteger. bs)]
     (.toString bi 8)))
 
@@ -49,10 +59,7 @@
 (defn byte->hex
   "Convert a single byte value to a two-character hex string."
   [b]
-  (let [hex (Integer/toHexString
-              (if (neg? b)
-                (+ b const/MAX_UNSIGNED_BYTE)
-                b))]
+  (let [hex (->> (byte b) Byte/toUnsignedInt Integer/toHexString)]
     (cond->> hex
              (= 1 (count hex))
              (str \0))))
@@ -71,18 +78,22 @@
   (^String [bs]
    (b16-str bs :lower))
   (^String [^bytes bs char-case]
-   (cond-> (apply str (map byte->hex bs))
-           (= :upper char-case) str/upper-case)))
+   (let [ret (transduce
+               (map byte->hex)
+               str!
+               (StringBuilder. (int (* 2 (alength bs))))
+               bs)]
+     (cond-> ret (= :upper char-case) str/upper-case))))
 
 (defn b16-bytes
   "Decodes the provided String <bs> from Base16 (i.e. hex).
    Returns byte-array."
   ^bytes [^String s]
-  (let [length (/ (count s) 2)
+  (let [length (int (/ (count s) 2))
         data (byte-array length)]
     (dotimes [i length]
-      (let [octet (subs s (* 2 i) (* 2 (inc i)))]
-        (aset-byte data i (hex->byte octet))))
+      (let [octet (subs s (* 2 i) (* 2 (unchecked-inc i)))]
+        (aset-byte data i (byte (hex->byte octet)))))
     data))
 ;;=======================================
 
@@ -101,22 +112,63 @@
   "Decodes the provided String <bs> from Base2 (i.e. binary).
    If the length of <s> is not cleanly divisible by 8,
    any excess bits will be ignored. Returns byte-array."
-  ^bytes [^String s]
-  (->> s
+  ^bytes [^String bit-str]
+  {:pre [(-> bit-str count (rem 8) zero?)]}
+  (->> bit-str
        (partition 8)
-       (map #(Integer/parseInt (str/join %) 2))
+       (map (fn [bits]
+              (let [i (-> (str/join bits)
+                          (Integer/parseInt 2))]
+                (cond-> i
+                        (> i Byte/MAX_VALUE)
+                        (- const/MAX_UNSIGNED_BYTE)))))
        byte-array))
 
 (defmacro current-thread-interrupted? []
   `(.isInterrupted (Thread/currentThread)))
 
-(defn copy-byte-array
-  ([^bytes bs]
+(defn bits->bytes
+  ^bytes [^String bits]
+  {:pre [(-> bits count (rem 8) zero?)]}
+  (->> bits
+       (partition 8)
+       (map (fn [bits]
+              (let [i (-> (str/join bits)
+                          (Integer/parseInt 2))]
+                (cond-> i (> i 127) (- 256)))))
+       byte-array))
+
+(defn pad-bits
+  [^long target-length ^String bits]
+  (let [bits-length (count bits)]
+    (cond-> bits
+            (> target-length bits-length)
+            (->> ;; pad it at the front
+              (concat (repeat (- target-length bits-length) \0))
+              (apply str)))))
+
+(defn bytes->bits
+  ^String [^bytes bs]
+  (let [size (long (* 8 (alength bs)))
+        bi   (BigInteger. 1 bs)
+        bits (.toString bi 2)]
+    (cond->> bits
+             (> size (.length bits))
+             (pad-bits size))))
+
+(defn  copy-of-byte-array
+  (^bytes [^bytes bs]
    (aclone bs))
-  ([^bytes bs from]
-   (copy-byte-array bs from (alength bs)))
-  ([^bytes bs from to]
+  (^bytes [^bytes bs from]
+   (copy-of-byte-array bs from (alength bs)))
+  (^bytes [^bytes bs from to]
    (Arrays/copyOfRange bs (int from) (int to))))
+
+(defn copy-bytes!
+  [^bytes source ^bytes dest]
+  {:pre [(== (alength source)
+             (alength dest))]}
+  (areduce source i ret dest (doto ret (aset i (aget source i)))))
 
 (defn concat-byte-arrays
   ^bytes [& arrays]
@@ -222,9 +274,9 @@
        (.compact buff)))))
 
 (defn rand-long
-  ([minimum maximum]
+  (^long [^long minimum maximum]
    (+ minimum (rand-long maximum)))
-  ([maximum]
+  (^long [maximum]
    (long (rand maximum))))
 
 (defn name++

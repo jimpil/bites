@@ -2,47 +2,28 @@
   (:require [bites
              [buffer :as buffer]
              [constants :as constants]
-             [util :as ut]]
+             [util :as ut]
+             [bin-string :as bin-string]]
             [clojure.java.io :as io])
   (:import (java.nio ByteBuffer ReadOnlyBufferException CharBuffer)
            (java.nio.charset Charset CharsetEncoder)
            (java.nio.channels FileChannel ReadableByteChannel Channels)
            (java.net URI URL)
            (java.io File InputStream ByteArrayOutputStream ObjectOutputStream Serializable ByteArrayInputStream ObjectInputStream FileInputStream)
-           (java.util UUID Arrays)
+           (java.util UUID)
            (javax.imageio ImageIO)
            (java.awt.image BufferedImage)))
 
 (defprotocol ToByteArray (toBytes ^bytes [x opts]))
 (defmulti fromBytes (fn [klass x opts] klass))
 
-;;==============<PRIVATE HELPERS>================
-(defn- base-encoded
-  [^String s enc b64-flavor]
-  (if (empty? s)
-    (byte-array 0)
-    (case enc
-      :uuid (-> (UUID/fromString s) (toBytes s))
-      :b2  (ut/binary-bytes s)
-      :b8  (ut/octal-bytes s)
-      :b64 (ut/b64-bytes s b64-flavor)
-      :b16 (ut/b16-bytes s))))
-
-(defn- base-decoded
-  ^String [^bytes bs enc b64-flavor]
-  (if (empty? bs)
-    constants/EMPTY_STRING
-    (case enc
-      :uuid (str (fromBytes UUID bs nil))
-      :b2  (ut/binary-str bs)
-      :b8  (ut/octal-str bs)
-      :b64 (ut/b64-str bs b64-flavor)
-      :b16 (ut/b16-str bs))))
+(defmethod bin-string/to-bytes   :uuid [_ ^String s _] (-> (UUID/fromString s) (toBytes nil)))
+(defmethod bin-string/from-bytes :uuid [_ ^bytes bs _] (str (fromBytes UUID bs nil)))
 
 ;;==============<CONCRETIONS>================
 (defmethod fromBytes UUID
-  [_ ^bytes bs _]
-  (let [bb   (ByteBuffer/wrap bs)
+  [_ ^bytes bs opts]
+  (let [^ByteBuffer bb (buffer/wrap bs (:byte-order opts))
         high (.getLong bb)
         low  (.getLong bb)]
     (UUID. high low)))
@@ -52,12 +33,12 @@
   (-> bs ByteBuffer/wrap .getInt))
 
 (defmethod fromBytes Long
-  [_ ^bytes bs _]
-  (-> bs ByteBuffer/wrap .getLong))
+  [_ ^bytes bs opts]
+  (-> bs (buffer/wrap (:byte-order opts)) .getLong))
 
 (defmethod fromBytes Double
-  [_ ^bytes bs _]
-  (-> bs ByteBuffer/wrap .getDouble))
+  [_ ^bytes bs opts]
+  (-> bs (buffer/wrap (:byte-order opts)) .getDouble))
 
 (defmethod fromBytes BigInteger
   [_ ^bytes bs _]
@@ -65,9 +46,10 @@
 
 (defmethod fromBytes BigDecimal
   [_ ^bytes bs _]
-  (let [scale-bs   (byte-array (take 4 bs))
+  (let [[scale-bs* unscaled-value-bs*] (split-at 4 bs)
+        scale-bs   (byte-array scale-bs*)
         ^int scale (fromBytes Integer scale-bs nil)
-        unscaled-value-bs (byte-array (drop 4 bs))
+        unscaled-value-bs (byte-array unscaled-value-bs*)
         unscaled-value (BigInteger. unscaled-value-bs)]
     (BigDecimal. unscaled-value scale)))
 
@@ -81,7 +63,7 @@
     (condp instance? enc
       Charset (String. bs ^Charset enc)
       String  (String. bs ^String enc)
-      (base-decoded bs enc (:b64-flavor opts)))
+      (bin-string/from-bytes enc bs (:b64-flavor opts)))
     (String. bs)))
 
 (defmethod fromBytes BufferedImage
@@ -160,8 +142,8 @@
       (.getBytes this)
       (condp instance? encoding
         Charset (.getBytes this ^Charset encoding)
-        String  (.getBytes this ^String  encoding)
-        (base-encoded this encoding b64-flavor))))
+        String (.getBytes this ^String  encoding)
+        (bin-string/to-bytes encoding this b64-flavor))))
 
   UUID
   (toBytes [this opts]
@@ -234,11 +216,11 @@
 
   ReadableByteChannel
   (toBytes [this opts]
-    (let [buffer-size (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
+    (let [^long buffer-size (:buffer-size opts constants/DEFAULT_BUFFER_SIZE)
           read!  #(.read this %)]
       (loop [accum  (transient [])
              buffer (ByteBuffer/allocate buffer-size)
-             nread  (read! buffer)]
+             ^long nread  (read! buffer)]
         (cond
           (> (count accum) constants/MAX_ARRAY_SIZE)
           ;; mimic `Files/readAllBytes` method

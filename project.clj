@@ -3,13 +3,15 @@
   :url "https://github.com/jimpil/bites"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}
-  :dependencies [[org.clojure/clojure "1.10.3" :scope "provided"]
-                 [com.fasterxml.jackson.dataformat/jackson-dataformat-cbor "2.13.2"]]
+  :dependencies [[org.clojure/clojure "1.11.1" :scope "provided"]
+                 [com.fasterxml.jackson.dataformat/jackson-dataformat-cbor "2.14.0"]]
   :profiles
   {:dev {:dependencies [;; for testing
                         [org.clojure/test.check "1.1.1"]
                         [commons-codec/commons-codec "1.15"]]}}
   :repl-options {:init-ns bites.core}
+  :global-vars {*warn-on-reflection* true
+                *unchecked-math* :warn-on-boxed}
 
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version" "leiningen.release/bump-version" "release"]

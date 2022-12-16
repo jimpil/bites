@@ -9,7 +9,7 @@
       (is (= [97 1 2 3 4]
              (-> [1 2 3 4]
                  byte-array
-                 (left-pad \a) ;; (byte \a) => 97
+                 (left-pad \a)
                  seq)))
       (is (= [97 98 99 1 2 3 4]
              (-> [1 2 3 4]

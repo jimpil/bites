@@ -18,11 +18,12 @@
       :right (ut/concat-byte-arrays this pad-val))))
 
 (defn- with-target-length
-  [side ^bytes this pad target]
+  [side ^bytes this pad ^long target]
   (let [have (alength this)
         need (- target have)]
     (if (pos? need)
-      (->> (byte pad)
+      (->> (array/toBytes pad nil)
+           first
            (repeat need)
            byte-array
            (with-padding-values side this))
@@ -57,14 +58,14 @@
   (left-pad
     ([this pad]       ;; Characters/String
      (apply str pad this))
-    ([this pad target]
+    ([this pad ^long target]
      (let [need (- target (count this))]
        (apply str  (concat (repeat need pad) this)))))
 
   (right-pad
     ([this pad]
      (apply str this pad)) ;; Characters/String
-    ([this pad target]
+    ([this pad ^long target]
      (let [need (- target (count this))]
        (apply str this (repeat need pad)))))
 

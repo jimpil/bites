@@ -4,9 +4,9 @@
             [bites.padding :as padding]))
 
 (defn encode-length
-  [length [prefix endianess]]
-  (assert (pos? length))
-  (assert (#{:be :le nil} endianess))
+  [^long length [prefix endianess]]
+  {:pre [(pos? length)
+         (contains? #{:be :le nil} endianess)]}
   (case prefix
     :int16
     (if (neg? (Integer/compareUnsigned const/MAX_UNSIGNED_SHORT length))

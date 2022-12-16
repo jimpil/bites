@@ -4,70 +4,30 @@
             [bites.padding :as padding]))
 ;; (U)BYTE
 (def ubyte? #(< -1 % const/MAX_UNSIGNED_BYTE))
-
-(defn byte->ubyte
-  "Get the unsigned value of byte <b>.
-   ----------------------
-   byte   -> unsigned-int
-   ----------------------
-   110    -> 110
-   0      -> 0
-   -1     -> 255
-   ----------------------
-   NOTE: Java doesn't support unsigned bytes so int must be used to get an unsigned byte"
-  [x]
-  (cond-> x
-          (neg? x)
-          Byte/toUnsignedInt))
-
-(defn ubyte->byte
-  "Get the signed byte value of an unsigned int <x>.
-   -----------------
-   int  -> byte
-   -----------------
-   0    -> 0
-   127  -> 127
-   -128 -> -128
-   255  -> -1
-   -129 -> Exception
-   -----------------"
-  [b]
-  (byte
-    (cond-> b
-            (> b Byte/MAX_VALUE)
-            (- const/MAX_UNSIGNED_BYTE))))
+(defn byte->ubyte [x] (Byte/toUnsignedInt (byte x)))
+(defn ubyte->byte [b] {:pre [(ubyte? b)]} (byte b)) ;; this will work given the pre-condition
 
 ;; (U)SHORT
 (def ushort? #(< -1 % const/MAX_UNSIGNED_SHORT))
-
-(defn short->ushort
-  [x]
-  (cond-> x
-          (neg? x)
-          Short/toUnsignedInt))
+(defn short->ushort [x] (Short/toUnsignedInt x))
 
 (defn ushort->short
   [x]
-  (short
-    (cond-> x
-            (> x Short/MAX_VALUE)
-            (- const/MAX_UNSIGNED_SHORT))))
+  {:pre [(ushort? x)]}
+  (let [x (int x)]
+    (short
+      (cond-> x
+              (> x Short/MAX_VALUE)
+              (- const/MAX_UNSIGNED_SHORT)))))
 
 ;; (U)INT
 (def uint? #(< -1 % const/MAX_UNSIGNED_INT))
-
-(defn parse-uint
-  [^String x]
-  (Integer/parseUnsignedInt x))
-
-(defn int->uint
-  ^long [x]
-  (cond-> x
-          (neg? x)
-          Integer/toUnsignedLong))
+(defn parse-uint [^String x] (Integer/parseUnsignedInt x))
+(defn int->uint ^long [x] (Integer/toUnsignedLong x))
 
 (defn uint->int
-  [x]
+  [^long x]
+  {:pre [(uint? x)]}
   (int
     (cond-> x
             (> x Integer/MAX_VALUE)
@@ -75,23 +35,21 @@
 
 ;; (U)LONG
 (def ulong? #(< -1 % const/MAX_UNSIGNED_LONG))
-
-(defn parse-ulong
-  ^long [^String x]
-  (Long/parseUnsignedLong x))
+(defn parse-ulong ^long [^String x] (Long/parseUnsignedLong x))
 
 (defn long->ulong
-  ^BigInteger [x]
+  [^long x]
   (cond-> x
           (neg? x)
           (-> Long/toUnsignedString BigInteger.)))
 
 (defn ulong->long
-  ^long [x]
+  ^long [^BigInteger x]
+  {:pre [(ulong? x)]}
   (long
     (cond-> x
-            (> x Long/MAX_VALUE)
-            (- const/MAX_UNSIGNED_LONG))))
+            (pos? (compare x (BigInteger/valueOf Long/MAX_VALUE)))
+            (.subtract (BigInteger/valueOf const/MAX_UNSIGNED_LONG)))))
 ;;----------------------------------------
 
 (defn nibble->char

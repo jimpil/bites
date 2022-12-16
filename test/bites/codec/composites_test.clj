@@ -214,8 +214,8 @@
   (let [c1 (padded :int-be :length 6 :padding-byte (int \x))
         c2 (padded (string "UTF-8" :length 6) :length 6)
         c3 (padded (repeated :int-le :length-prefix :byte) :length 10 :padding-byte 0x99)
-        c4 (padded (cstring "US-ASCII") :length 12 :padding-byte (byte \x) :truncate? true)
-        c5 (padded (cstring "US-ASCII") :length 3 :padding-byte (byte \x) :truncate? true)
+        c4 (padded (cstring "US-ASCII") :length 12 :padding-byte (int \x) :truncate? true)
+        c5 (padded (cstring "US-ASCII") :length 3 :padding-byte (int \x) :truncate? true)
         c6 (padded (repeated (cstring "UTF-8")) :length 11 :truncate? true)
         v1 (int 55)
         v2 "abcdef"

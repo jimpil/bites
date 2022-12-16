@@ -8,14 +8,14 @@
   [start-exchange!]
   (let [ret   (agent [])
         done? (promise)
-        limit 500
+        limit 100
         consume! (partial send-off ret conj)
         id    (AtomicLong. 0)
         produce* (partial str "Message-")
         produce! (fn p
                    ([] (p nil))
                    ([_] ;; produce at random intervals
-                    (Thread/sleep (rand-int 100))
+                    (Thread/sleep (rand-int 50))
                     (produce* (.incrementAndGet id))))
         [[_ _ :as ploops]
          [_ _ :as cloops]] (start-exchange! produce! consume!)]

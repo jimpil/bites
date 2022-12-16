@@ -10,8 +10,8 @@
   (is (= (.cardinality jbs)
          (count (remove zero? mbs))))
   (let [length (count mbs)]
-    (doseq [i (range length)
-            :let [my-bit (mbs i)]]
+    (doseq [^long i (range length)
+            :let [^long my-bit (mbs i)]]
       (is (= (if (zero? my-bit) false true)
              ;; it's little-endian - start from the end!
              (.get jbs (Math/abs (int (- i (dec length))))))))))

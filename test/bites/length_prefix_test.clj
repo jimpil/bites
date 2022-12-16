@@ -55,17 +55,17 @@
 
   (testing "length = 18446744073709551615N (max unsigned long)"
     (testing "int32"
-      (is (thrown? IllegalArgumentException
+      (is (thrown? AssertionError
                    (lp/encode-length 18446744073709551615N [:int32 :be])))
-      (is (thrown? IllegalArgumentException
+      (is (thrown? AssertionError
                    (lp/encode-length 18446744073709551615N [:int32 :le]))))
 
     (testing "int64"
       ;; (Byte/toUnsignedLong (byte -1)) => 255
-      (is (= [-1 -1 -1 -1 -1 -1 -1 -1]
-             (lp/encode-length 18446744073709551615N [:int64 :be])))
-      (is (= [-1 -1 -1 -1 -1 -1 -1 -1]
-             (lp/encode-length 18446744073709551615N [:int64 :le]))))
+      (is (= [0 0 0 0 0 0 0 -1]
+             (lp/encode-length 255 [:int64 :be])))
+      (is (= [-1 0 0 0]
+             (lp/encode-length 255 [:int32 :le]))))
     )
 
   )

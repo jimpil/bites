@@ -13,7 +13,7 @@
            (java.io ByteArrayOutputStream StringReader ByteArrayInputStream)
            (java.nio.file Files)))
 
-(def default-runs 10000)
+(def default-runs 1000)
 
 (defspec copy-byte-buffer-to-byte-stream default-runs
   (prop/for-all [^bytes v gen/bytes]
@@ -85,7 +85,6 @@
         (is (Arrays/equals data-bytes (core/to-bytes bout)))))
 
     (io/delete-file temp-path))
-
 
   )
 

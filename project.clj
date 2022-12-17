@@ -12,7 +12,7 @@
   :repl-options {:init-ns bites.core}
   :global-vars {*warn-on-reflection* true
                 *unchecked-math* :warn-on-boxed}
-
+  :aot [bites.array bites.idz.uuidv7]
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version" "leiningen.release/bump-version" "release"]
                   ["vcs" "commit"]

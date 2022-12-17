@@ -135,7 +135,8 @@
        (map (fn [bits]
               (let [i (-> (str/join bits)
                           (Integer/parseInt 2))]
-                (cond-> i (> i 127) (- 256)))))
+                (cond-> i (> i 127)
+                        (- const/MAX_UNSIGNED_BYTE)))))
        byte-array))
 
 (defn pad-bits

@@ -50,7 +50,7 @@
            (recur (unchecked-inc idx) buf)))))))
 
 (defn with-sync-exchange!
-  "Given a producing-fn, and a consuming-fn (both 1-arg),
+  "Given a producing-fn (0/1-arg), and a consuming-fn (1-arg),
    assign each its own thread and object-array of size <buffer>,
    and has them exchanging arrays when they're BOTH ready
    (i.e. their respective operation exhausted the array it was working with).

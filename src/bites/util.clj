@@ -214,11 +214,19 @@
 (defn reverse-bytes
   (^bytes [array]
    (reverse-bytes array 0))
-  (^bytes [^bytes array start-idx]
-   (->> array (drop start-idx) reverse byte-array)))
+  ([^bytes array from] (reverse-bytes array from (alength array)))
+  (^bytes [^bytes array ^long from ^long to] ;; inclusive/exclusive
+   ;{:pre [(< from to)]}
+   (let [target-length (- to from)
+         bs (byte-array target-length)]
+     (dotimes [idx target-length]
+       (->> (- to idx 1)
+            (aget array)
+            (aset bs idx)))
+     bs)))
 
 (defn string-bytes
-  [^String encoding ^String s]
+  ^bytes [^String encoding ^String s]
   (.getBytes s encoding))
 
 (defn reducible-range
@@ -226,7 +234,7 @@
    (reify IReduceInit
      (reduce [_ f init]
        (loop [result init
-              i (long 0)]
+              i 0]
          (if (reduced? result)
            @result
            (recur (f result i) (unchecked-inc i)))))))
@@ -234,12 +242,12 @@
    (reducible-range 0 end))
   ([start end]
    (reducible-range start end 1))
-  ([start end ^long step]
+  ([^long start ^long end ^long step]
    (reify IReduceInit
      (reduce [_ f init]
        (loop [result init,
-              i (long start)]
-         (if (= i end)
+              i start]
+         (if (== i end)
            @(ensure-reduced result)
            (recur (f result i) (unchecked-add i step))))))))
 

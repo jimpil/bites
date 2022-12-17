@@ -13,22 +13,41 @@
 (defn- start-consuming-with
   [consume! ^long buffer ^Exchanger exch]
   (loop [idx 0
-         buf (object-array buffer)]
+         buf  (object-array buffer)]
     (when-not (ut/current-thread-interrupted?)
       (if (zero? idx)
+        ;; the very first time round there won't be any data
+        ;; so wait for the producing side to become ready to exchange
         (recur buffer (exchange! exch buf))
-        (do (consume! (aget buf (- buffer idx)))
-            (recur (unchecked-dec idx) buf))))))
+        (let [idx* (- buffer idx)
+              v (aget buf idx*)]
+          ;(println "Consuming value:" v)
+          (aset buf idx* (consume! v))
+          (recur (unchecked-dec idx) buf))))))
 
 (defn- start-producing-with
-  [produce! ^long buffer ^Exchanger exch]
-  (loop [idx 0
-         buf (object-array buffer)]
-    (when-not (ut/current-thread-interrupted?)
-      (if (= buffer idx)
-        (recur 0 (exchange! exch buf))
-        (do (aset buf idx (produce! (aget buf idx)))
-            (recur (unchecked-inc idx) buf))))))
+  ([produce! ^long buffer ^Exchanger exch]
+   (start-producing-with produce! buffer ::prod-init exch))
+  ([produce! ^long buffer init ^Exchanger exch]
+   (loop [idx 0
+          buf (->> init (repeat buffer) object-array)]
+     (when-not (ut/current-thread-interrupted?)
+       (if (== buffer idx)
+         (recur 0 (exchange! exch buf))
+         ;; `produce!` must support 2 arities:
+         ;; 1. no-args for the first time round
+         ;; 2. one-arg for all the rest rounds
+         ;; Note: it is conceivable that ::init
+         ;; will appear again (after the first round)
+         ;; as a result of the consumer putting it there
+         ;; This is of course extremely unlikely,
+         ;; unless of the consumer does it on purpose
+         ;; (e.g. wants to ask the producer to 're-seed' itself?)
+         (let [v (aget buf idx)]
+           ;(println "Producing with value:" v)
+           (->> (if (= v init) (produce!) (produce! v))
+                (aset buf idx))
+           (recur (unchecked-inc idx) buf)))))))
 
 (defn with-sync-exchange!
   "Given a producing-fn, and a consuming-fn (both 1-arg),

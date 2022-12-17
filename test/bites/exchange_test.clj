@@ -8,7 +8,7 @@
   [start-exchange!]
   (let [ret   (agent [])
         done? (promise)
-        limit 100
+        limit 256
         consume! (partial send-off ret conj)
         id    (AtomicLong. 0)
         produce* (partial str "Message-")
@@ -21,9 +21,9 @@
          [_ _ :as cloops]] (start-exchange! produce! consume!)]
     (add-watch ret :abort
                (fn [_ _ _ n]
-                 (when (= limit (count n))
-                   (map future-cancel ploops)
-                   (map future-cancel cloops)
+                 (when (== limit (count n))
+                   (run! future-cancel ploops)
+                   (run! future-cancel cloops)
                    (deliver done? true))
                  ;(println (peek n))
                  ))

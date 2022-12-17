@@ -9,8 +9,10 @@
         _   (-> (ObjectOutputStream. bos)
                 (.writeObject  u1))
         written-bytes (.toByteArray bos)
-        bis (ByteArrayInputStream. written-bytes)
-        u2 (.readObject (ObjectInputStream. bis))]
+        u2 (->> written-bytes
+                (ByteArrayInputStream. )
+                (ObjectInputStream.)
+                .readObject)]
     (is (= u1 u2))
     (is (not (identical? u1 u2)))
     )
@@ -18,7 +20,7 @@
 
 (deftest comparable
   (let [gen-id! (uuidv7/batch-generator)
-        uuids   (repeatedly 100 gen-id!)]
+        uuids   (doall (repeatedly 100 gen-id!))]
     (is (= uuids (sort uuids)))))
 
 (deftest static-from-string

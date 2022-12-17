@@ -91,9 +91,9 @@
 
 (defn- impl-init
   ([]
-   [[] (atom {})])
+   [[] (volatile! {})])
   ([raw]
-   [[] (atom (init* raw))]))
+   [[] (volatile! (init* raw))]))
 
 (defn- impl-toBytes [this opts]
   (let [{:keys [^bytes raw]} (state* this)]
@@ -132,7 +132,7 @@
         buf (byte-array 16)]
         (when (== 16 (.read in buf)) ;; don't proceed unless 16 bytes were read
           (->> (init* buf)
-               (reset! state)))))
+               (vreset! state)))))
 
 (defn- impl-writeExternal
   [this ^ObjectOutput out]

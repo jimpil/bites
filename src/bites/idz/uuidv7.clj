@@ -7,7 +7,7 @@
             [bites.buffer :as buffer])
   (:import [java.time Instant Duration]
            (java.util Arrays)
-           (java.io Externalizable Writer ObjectInput ObjectOutput)
+           (java.io Writer ObjectInput ObjectOutput)
            (java.nio ByteBuffer)))
 
 (def ^:const UNIX_TS_MS_BIT_COUNT 48)

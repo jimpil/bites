@@ -1,7 +1,7 @@
 (ns bites.util
   (:require [clojure.string :as str]
             [bites.constants :as const])
-  (:import [java.util Base64 Arrays]
+  (:import [java.util Base64 Arrays Collections]
            (java.nio ByteBuffer)
            (java.nio.charset Charset CharsetEncoder)
            (clojure.lang IReduceInit)
@@ -215,16 +215,7 @@
   (^bytes [array]
    (reverse-bytes array 0))
   (^bytes [^bytes array start-idx]
-   (let [l (alength array)
-         start-idx (int start-idx)]
-     (loop [i (unchecked-subtract-int l (unchecked-inc-int start-idx))
-            j (int start-idx)
-            a (byte-array (unchecked-subtract-int l j))]
-       (if (= j l)
-         a
-         (recur (unchecked-dec-int i)
-                (unchecked-inc-int j)
-                (doto a (aset i (aget array j)))))))))
+   (->> array (drop start-idx) reverse byte-array)))
 
 (defn string-bytes
   [^String encoding ^String s]

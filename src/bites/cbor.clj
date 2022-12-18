@@ -226,6 +226,7 @@
           "VALUE_NULL" nil))
 
       (parse-per-tag [^CBORParser p ^long tag]
+        ;; https://www.iana.org/assignments/cbor-tags/cbor-tags.xhtml
         (case tag
           0 (let [s (.getText p)]
               (LocalDateTime/parse s) ;; verify
@@ -244,7 +245,7 @@
                  (-> (Class/forName class-name)
                      (.getConstructor (into-array Class []))
                      (.newInstance (object-array 0)))
-                 (let [ns-end (.lastIndexOf class-name ".")
+                 (let [ns-end (str/last-index-of class-name ".")
                        class-simple-name (subs class-name (inc ns-end) (.length class-name))
                        package-str (subs class-name 0 ns-end)]
                    (if-some [ctor (-> package-str

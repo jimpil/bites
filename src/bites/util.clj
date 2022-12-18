@@ -1,6 +1,7 @@
 (ns bites.util
   (:require [clojure.string :as str]
-            [bites.constants :as const])
+            [bites.constants :as const]
+            [clojure.set :as set])
   (:import [java.util Base64 Arrays Collections]
            (java.nio ByteBuffer)
            (java.nio.charset Charset CharsetEncoder)
@@ -15,6 +16,10 @@
   ([]                    (StringBuilder.)) ;; init
   ([^StringBuilder sb]   (.toString sb))   ;; complete
   ([^StringBuilder sb x] (.append sb x)))  ;; accumulate
+
+(defn find-first
+  [pred coll]
+  (some #(when (pred %) %) coll))
 
 (defn octal-bytes
   ^bytes [^String s]
@@ -298,21 +303,30 @@
        (remove (fn [^Field x]
                  (Modifier/isStatic (.getModifiers x))))))
 
+(def ^:private keym
+  {:boolean Boolean/TYPE
+   :byte    Byte/TYPE
+   :double  Double/TYPE
+   :float   Float/TYPE
+   :int     Integer/TYPE
+   :long    Long/TYPE
+   :short   Short/TYPE})
+
+(def ^:private prims
+  (map keym [:boolean :byte :double :float :int :long :short]))
+
+(def ^:private boxed
+  [Boolean Byte Double Float Integer Long Short])
+
+(def ^:private convm
+  (zipmap (concat prims boxed)
+          (concat boxed prims)))
+
 (defn find-best-ctors
   [^Class klass args]
-  (let [keym {:boolean Boolean/TYPE
-              :byte    Byte/TYPE
-              :double  Double/TYPE
-              :float   Float/TYPE
-              :int     Integer/TYPE
-              :long    Long/TYPE
-              :short   Short/TYPE}
-        args (->> args
+  (let [args (->> args
                   (map #(if (class? %) % (keyword %)))
                   (map #(keym % %)))
-        prims (map keym [:boolean :byte :double :float :int :long :short])
-        boxed [Boolean Byte Double Float Integer Long Short]
-        convm (zipmap (concat prims boxed) (concat boxed prims))
         ctors (->> (.getConstructors klass)
                    (filter #(== (count args) (count (.getParameterTypes ^Constructor %))))
                    (filter #(every? (fn [[^Class pt a]]
@@ -336,3 +350,64 @@
         (->> m
              (filter (comp #{min-steps} (partial apply max) key))
              vals)))))
+
+(defn vec-swap! [v i1 i2]
+  (assoc! v
+          i2 (v i1)
+          i1 (v i2)))
+
+(defn strip-whitespace
+  [characters]
+  (remove #(Character/isWhitespace ^char %) characters))
+
+(defn chars-intersection
+  [str1 str2]
+  (keep #(some #{%} str2) (distinct str1)))
+
+(defn chars-subtraction
+  [str1 str2]
+  (remove #(some #{%} str2) str1))
+
+(defn ceil
+  ^long [v]
+  (long (Math/ceil v)))
+
+(defn expt
+  [b e]
+  (Math/pow b e))
+
+(defn positions
+  "Returns the indexes of the items in the collection whose items satisfy the predicate"
+  [pred coll]
+  (keep-indexed (fn [idx x] (when (pred x) idx)) coll))
+
+(defmacro xor
+  ([] nil)
+  ([a] a)
+  ([a b]
+   `(let [a# ~a
+          b# ~b]
+      (if a#
+        (if b# false a#)
+        (if b# b# false)))))
+
+(defn split-on-chars
+  [^String instr splitstr]
+  (let [instr-length (.length instr)
+        sep-set (set splitstr)]
+    (loop [idx 0
+           chg false
+           letters (transient [])]
+      (if (< idx instr-length)
+        (let [letter (.charAt instr idx)
+              sep?   (contains? sep-set letter) ;(boolean (some #{letter} splitstr))
+              this-chg (xor chg sep?)]
+          (recur (unchecked-inc idx)
+                 this-chg
+                 (cond-> letters
+                         (not sep?)
+                         (conj! [this-chg letter]))))
+        (->> letters
+             persistent!
+             (partition-by first)
+             (mapv (partial map second)))))))

@@ -125,7 +125,7 @@ See [rapio](https://github.com/jimpil/rapio)
 for reading **local** resources larger than 2GB into a sequence of byte-arrays.     
 
 ## Requirements
-- Java 8+
+- Java 11+
 
 ## License
 

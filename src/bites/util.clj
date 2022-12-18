@@ -173,7 +173,7 @@
 
 (defn concat-byte-arrays
   ^bytes [& arrays]
-  (let [total-length (apply + (map #(alength ^bytes %) arrays))
+  (let [total-length (transduce (map #(alength ^bytes %)) + arrays)
         ^ByteBuffer buffer (reduce
                              (fn [^ByteBuffer buff ^bytes arr]
                                (.put buff arr))
@@ -214,16 +214,20 @@
 (defn reverse-bytes
   (^bytes [array]
    (reverse-bytes array 0))
-  ([^bytes array from] (reverse-bytes array from (alength array)))
+  ([^bytes array from]
+   (reverse-bytes array from (alength array)))
   (^bytes [^bytes array ^long from ^long to] ;; inclusive/exclusive
    ;{:pre [(< from to)]}
-   (let [target-length (- to from)
-         bs (byte-array target-length)]
-     (dotimes [idx target-length]
-       (->> (- to idx 1)
-            (aget array)
-            (aset bs idx)))
-     bs)))
+   (if (zero? (alength array))
+     array
+     (let [target-length (- to from)
+           bs (byte-array target-length)]
+       (dotimes [idx target-length]
+         (->> (- to idx)
+              unchecked-dec
+              (aget array)
+              (aset bs idx)))
+       bs))))
 
 (defn string-bytes
   ^bytes [^String encoding ^String s]

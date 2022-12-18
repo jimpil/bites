@@ -20,8 +20,10 @@
 
 (deftest comparable
   (let [gen-id! (uuidv7/batch-generator)
-        uuids   (doall (repeatedly 100 gen-id!))]
-    (is (= uuids (sort uuids)))))
+        uuids   (repeatedly 100 gen-id!)
+        sorted (sort uuids)]
+    (is (= uuids sorted))
+    (is (= (map str uuids) (map str sorted)))))
 
 (deftest static-from-string
   (let [u1 (uuidv7/new-id)

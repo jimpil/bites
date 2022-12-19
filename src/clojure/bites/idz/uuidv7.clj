@@ -34,7 +34,7 @@
 (defmethod bin-string/to-bytes   :uuidv7 [_ s _]  (-> s from-string (array/toBytes nil)))
 (defmethod array/fromBytes UUIDV7 [_ ^bytes bs _] (->UUIDV7 bs))
 (defmethod print-method UUIDV7 [u ^Writer wrt] (->> (str "#uuidv7" \" u \") (.write wrt)))
-(def data-readers {'uuidv7 from-string})
+(def edn-reader {'uuidv7 from-string})
 ;;---------------------------------------
 (defn unix-ts-ms
   "Returns a String of 48 bits (6 bytes)

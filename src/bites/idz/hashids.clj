@@ -50,16 +50,16 @@
 
 (defn dehash
   ;; Known as 'unhash' in other implementations
-  [input alphabet]
+  [input ^String alphabet]
   (let [ab-length    (count alphabet)
         input-length (count input)]
     (transduce
-      (comp
-        (map-indexed
-          (fn [^long idx c]
-            (when-let [^long pos (first (util/positions #{c} alphabet))]
-              (* pos (long (util/expt ab-length (- input-length idx 1)))))))
-        (remove nil?))
+      (keep-indexed
+        (fn [^long idx c]
+          (when-some [^long pos (->> (range ab-length)
+                                     (util/find-first #(= ^char c (.charAt alphabet ^long %))))]
+            (* pos (long (util/expt ab-length (- input-length idx 1)))))))
+
       +
       input)))
 
@@ -187,24 +187,33 @@
          add-guards
          ensure-min-length)))
 
+;; PUBLIC API
+;;-----------
+
 (defn encode
+  "Encodes a seq of positive integers <nums> (presumably ids)
+   into a `hashids` String (per <opts>)."
   [opts nums]
-  {:pre [(not-empty nums)
-         (every? (some-fn zero? pos-int?) nums)]}
+  {:pre [(seq nums)
+         (every? nat-int? nums)]}
   (-> (encode-intern opts nums)
       :hash-str))
 
 (defn decode
+  "Decodes a hashids String into a vector of positive integers."
   [opts ^String encoded]
   {:pre [(seq encoded)]}
   (let [{:keys [seps alphabet salt guards]} (setup opts)
         breakdown (util/split-on-chars encoded guards)
-        breakdown-idx (if (some #{(count breakdown)} [2 3]) 1 0)
-        bdn (->> (nth breakdown breakdown-idx)
-                 (apply str))
-        lottery (first bdn)
+        breakdown-length (count breakdown)
+        breakdown-idx (if (or (== breakdown-length 2)
+                              (== breakdown-length 3))
+                        1
+                        0)
+        bdn       (str/join (nth breakdown breakdown-idx))
+        lottery   (first bdn)
         ab-length (count alphabet)
-        arr (util/split-on-chars (subs bdn 1) seps)
+        arr       (util/split-on-chars (subs bdn 1) seps)
         decoded-result (loop [ret (transient [])
                               ab alphabet
                               arr arr]

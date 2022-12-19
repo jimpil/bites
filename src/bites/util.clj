@@ -376,11 +376,6 @@
   [b e]
   (Math/pow b e))
 
-(defn positions
-  "Returns the indexes of the items in the collection whose items satisfy the predicate"
-  [pred coll]
-  (keep-indexed (fn [idx x] (when (pred x) idx)) coll))
-
 (defmacro xor
   ([] nil)
   ([a] a)

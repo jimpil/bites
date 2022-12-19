@@ -11,7 +11,7 @@
 (def ^:const VERSION_BITS "0111")
 (def ^:const VARIANT_BITS "10")
 
-(defn ->UUIDV7 [bs] (UUIDV7. bs))
+(defn ->UUIDV7 [^bytes bs] (UUIDV7. bs))
 (defn from-string ^UUIDV7 [^String s] (UUIDV7/fromString s))
 (defn created-at ^Instant [^UUIDV7 u] (.createdAt u))
 

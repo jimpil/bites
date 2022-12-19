@@ -6,6 +6,9 @@
   :dependencies [[org.clojure/clojure "1.11.1" :scope "provided"]
                  ;; for CBOR support
                  [com.fasterxml.jackson.dataformat/jackson-dataformat-cbor "2.14.0"]]
+  :source-paths      ["src/clojure"]
+  :java-source-paths ["src/java"]
+
   :profiles
   {:dev {:dependencies [;; for testing
                         [org.clojure/test.check "1.1.1"]
@@ -14,7 +17,7 @@
   :repl-options {:init-ns bites.core}
   :global-vars {*warn-on-reflection* true
                 *unchecked-math* :warn-on-boxed}
-  :aot [bites.idz.uuidv7]
+
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version" "leiningen.release/bump-version" "release"]
                   ["vcs" "commit"]

@@ -1,165 +1,39 @@
 (ns bites.idz.uuidv7
   (:require [bites.random :as random]
             [bites.util :as util]
-            [clojure.string :as str]
             [bites.array :as array]
-            [bites.bin-string :as bin-string]
-            [bites.buffer :as buffer])
+            [bites.bin-string :as bin-string])
   (:import [java.time Instant Duration]
-           (java.util Arrays)
-           (java.io Writer ObjectInput ObjectOutput)
-           (java.nio ByteBuffer)))
+           (java.io Writer)
+           (bites.idz UUIDV7)))
 
 (def ^:const UNIX_TS_MS_BIT_COUNT 48)
 (def ^:const VERSION_BITS "0111")
 (def ^:const VARIANT_BITS "10")
-(defonce FORMAT-844412
-  (let [r (range 32)]
-    (->> r
-         (map
-           (fn [i]
-             (condp > i
-               8  \1
-               12 \2
-               16 \3
-               20 \4
-               32 \5)))
-         (zipmap r))))
 
-(defn- as-text
-  ^String [^bytes raw]
-  (transduce
-    (comp
-      (map-indexed vector)
-      (partition-by (comp FORMAT-844412 first))
-      (map (partial map second))
-      (interpose "-")
-      cat)
-    util/str!
-    (StringBuilder. 36)
-    (eduction (mapcat util/byte->hex) raw)))
-
-(gen-class
-  :name bites.idz.UUIDv7
-  :implements [bites.array.ToByteArray java.io.Externalizable Comparable]
-  :prefix "impl-"
-  :init init
-  :constructors {["[B"] []
-                 [] []} ;; nullary ctor required for Externalizable
-  :methods [[createdAt [Object] java.time.Instant]
-            [seqCounter [Object] Long]
-            ^:static [fromString [String] Object]] ;; wtf - https://stackoverflow.com/questions/29329798/clojure-gen-class-returning-own-class
-  :factory fromBytes
-  :state state)
-
-(defn ->UUIDv7 [bs] (new bites.idz.UUIDv7 bs))
-(defn- state* [^bites.idz.UUIDv7 this] @(.state this))
-(defn from-string
-  ^bites.idz.UUIDv7 [^String s]
-  (-> s
-      (str/replace "-" "")
-      util/b16-bytes
-      ->UUIDv7))
-
-(defn created-at
-  ^Instant [^bites.idz.UUIDv7 u]
-  (let [{:keys [^bytes ts-bs]} (state* u)]
-    (->> ts-bs
-         (BigInteger. 1)
-         long
-         Instant/ofEpochMilli)))
+(defn ->UUIDV7 [bs] (UUIDV7. bs))
+(defn from-string ^UUIDV7 [^String s] (UUIDV7/fromString s))
+(defn created-at ^Instant [^UUIDV7 u] (.createdAt u))
 
 (defn seq-counter
   "If <u> was created via `batch-generator`,
    returns the 12-bit seq-counter - otherwise
    returns some meaningless (random) number."
-  ^long [^bites.idz.UUIDv7 u]
-  (let [{:keys [^bytes seq-bs]} (state* u)
-        bits (util/bytes->bits seq-bs)
+  ^long [^UUIDV7 u]
+  (let [bs   (.toByteArray u)
+        bits (util/bytes->bits bs)
         counter-bits (subs bits 4)] ;; drop the 4 VERSION bits
     (Long/parseLong counter-bits 2)))
 
-(def ^:private impl-fromString from-string)
-(def ^:private impl-createdAt  created-at)
-(def ^:private impl-seqCounter seq-counter)
+(extend-type UUIDV7
+  array/ToByteArray
+  (toBytes [this _]
+    (.toByteArray this)))
 
-(defn- init* [raw]
-  {:raw     raw
-   :hex-str (as-text raw)
-   :ts-bs   (util/copy-of-byte-array raw 0 6)
-   :seq-bs  (util/copy-of-byte-array raw 6 8)})
-
-(defn- impl-init
-  ([]
-   [[] (volatile! {})])
-  ([raw]
-   [[] (volatile! (init* raw))]))
-
-(defn- impl-toBytes [this opts]
-  (let [{:keys [^bytes raw]} (state* this)]
-    (if (= :le (:byte-order opts))
-      (let [^ByteBuffer bb     (buffer/byte-buffer 16 :le)
-            most-significant   (util/copy-of-byte-array raw 0 8)
-            least-significant  (util/copy-of-byte-array raw 8 16)]
-        (->> most-significant  (BigInteger.) long (.putLong bb))
-        (->> least-significant (BigInteger.) long (.putLong bb))
-        (.array bb))
-      ;; avoid all the above for :be - just clone raw
-      (util/copy-of-byte-array raw))))
-
-(defn- impl-compareTo
-  [this other]
-  (if (instance? bites.idz.UUIDv7 other)
-    ;; compare timestamps (first 6 bytes),
-    ;; and if that fails (comes back zero) compare counters
-    (let [{:keys [^bytes ts-bs ^bytes seq-bs]} (state* this)
-          other-state (state* other)
-          this-ts  (BigInteger. 1 ts-bs)
-          other-ts (BigInteger. 1 ^bytes (:ts-bs other-state))
-          ret      (.compareTo this-ts other-ts)]
-      (if (zero? ret) ;; we should have counter-bits
-        (let [this-counter  (BigInteger. 1 seq-bs)
-              other-counter (BigInteger. 1 ^bytes (:seq-bs other-state)) ]
-          (.compareTo this-counter other-counter))
-        ret))
-    (throw
-      (IllegalArgumentException.
-        (str "Can NOT compare " (class this) " against " (class other))))))
-
-(defn- impl-readExternal
-  [^bites.idz.UUIDv7 this ^ObjectInput in]
-  (let [state (.state this)
-        buf (byte-array 16)]
-        (when (== 16 (.read in buf)) ;; don't proceed unless 16 bytes were read
-          (->> (init* buf)
-               (vreset! state)))))
-
-(defn- impl-writeExternal
-  [this ^ObjectOutput out]
-  (let [{:keys [^bytes raw]} (state* this)]
-    (.write out raw)
-    (.flush out)))
-
-(defn impl-equals
-  [this other]
-  (and (instance? bites.idz.UUIDv7 other)
-       (let [^bytes this-raw  (-> (state* this)  :raw)
-             ^bytes other-raw (-> (state* other) :raw)]
-         (Arrays/equals this-raw other-raw))))
-
-(defn impl-hashCode
-  [this]
-  (let [{:keys [^bytes raw]} (state* this)]
-    (Arrays/hashCode raw)))
-
-(defn impl-toString
-  [this]
-  (-> (state* this) :hex-str))
-
-(defmethod bin-string/from-bytes :uuidv7 [_ ^bytes bs _] (-> bs ->UUIDv7 str))
+(defmethod bin-string/from-bytes :uuidv7 [_ ^bytes bs _] (-> bs ->UUIDV7 str))
 (defmethod bin-string/to-bytes   :uuidv7 [_ s _]  (-> s from-string (array/toBytes nil)))
-(defmethod array/fromBytes bites.idz.UUIDv7 [_ ^bytes bs _] (->UUIDv7 bs))
-(defmethod print-method bites.idz.UUIDv7 [u ^Writer wrt] (->> (str "#uuidv7" \" (str u) \") (.write wrt)))
+(defmethod array/fromBytes UUIDV7 [_ ^bytes bs _] (->UUIDV7 bs))
+(defmethod print-method UUIDV7 [u ^Writer wrt] (->> (str "#uuidv7" \" u \") (.write wrt)))
 (def data-readers {'uuidv7 from-string})
 ;;---------------------------------------
 (defn unix-ts-ms
@@ -215,11 +89,11 @@
 (defn new-id
   "Generates a new uuid-v7 in non-batch mode.
    See https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-04.html#name-uuid-version-7"
-  ^bites.idz.UUIDv7 []
+  ^UUIDV7 []
   (->> (Instant/now)
        .toEpochMilli
        (gen-bytes nil)
-       ->UUIDv7))
+       ->UUIDV7))
 
 (defn batch-generator
   "Returns a no-arg fn to be used as a uuid-v7 generator in batching mode.
@@ -267,12 +141,12 @@
        (-> counter
            Long/toBinaryString
            (gen-bytes now-epoch)
-           ->UUIDv7)
+           ->UUIDV7)
        ;; counter overflow (highly unlikely)
        ;; pretend we're on the next clock tick
        (->> (inc now-epoch)
             (gen-bytes "0")
-            ->UUIDv7)
+            ->UUIDV7)
        )
      )
    )

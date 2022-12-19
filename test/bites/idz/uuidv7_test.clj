@@ -1,7 +1,8 @@
 (ns bites.idz.uuidv7-test
   (:require [clojure.test :refer :all]
             [bites.idz.uuidv7 :as uuidv7])
-  (:import (java.io ObjectInputStream ByteArrayInputStream ByteArrayOutputStream ObjectOutputStream)))
+  (:import (java.io ObjectInputStream ByteArrayInputStream ByteArrayOutputStream ObjectOutputStream)
+           (bites.idz UUIDV7)))
 
 (deftest externalisable
   (let [u1  (uuidv7/new-id)
@@ -27,5 +28,5 @@
 
 (deftest static-from-string
   (let [u1 (uuidv7/new-id)
-        u2 (bites.idz.UUIDv7/fromString (str u1))]
+        u2 (UUIDV7/fromString (str u1))]
     (is (= u1 u2))))

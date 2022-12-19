@@ -6,7 +6,7 @@
              [bin-string :as bin-string]]
             [clojure.java.io :as io])
   (:import (java.nio ByteBuffer ReadOnlyBufferException CharBuffer)
-           (java.nio.charset Charset CharsetEncoder)
+           (java.nio.charset Charset)
            (java.nio.channels FileChannel ReadableByteChannel Channels)
            (java.net URI URL)
            (java.io File InputStream ByteArrayOutputStream ObjectOutputStream Serializable ByteArrayInputStream ObjectInputStream FileInputStream)

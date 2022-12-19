@@ -94,18 +94,18 @@
   (let [known-encodings ['("this is my salt" [12345] "NkK9")
                          '("this is my salt" [12346] "69PV")
                          '("this was my salt" [12345] "dRn3")
-                         '("this was my salt" 12345 "dRn3")
+                         '("this was my salt" [12345] "dRn3")
                          '("" [0] "gY")
                          '("" [0 1 1000000] "pwcnfVMX3")
                          '("this is my salt" [547 31 241271 311 31397 1129 71129] "3RoSDhelEyhxRsyWpCx5t1ZK")]]
     (testing "encode/decode"
       (doseq [[salt nums encoding] known-encodings]
-        (is (= encoding (hid/encode {:salt salt} (flatten (list nums)))))
-        (is (= (flatten (list nums)) (hid/decode {:salt salt} encoding)))))))
+        (is (= encoding (hid/encode {:salt salt} nums)))
+        (is (= nums (hid/decode {:salt salt} encoding)))))))
 
 (deftest min-length-known-values
   "Test known encodings of integers from other hashids libraries, for a given salt"
-  (is (= "B0NkK9A5" (hid/encode {:salt "this is my salt" :min-length 8} '(12345)))))
+  (is (= "B0NkK9A5" (hid/encode {:salt "this is my salt" :min-length 8} [12345]))))
 
 (deftest failed-decodings-return-empty-collection
   "encode a set of numbers, and ensure that they return an empty collection when decrypted with a different salt"
@@ -123,4 +123,4 @@
   (is (empty? (hid/decode {:alphabet "aeiou09123456789"} "aBMswoO2UB3Sj"))))
 
 (deftest different-alphabet
-  (is (= "02949" (hid/encode {:alphabet "aeiouy0123456789"} '(12345)))))
+  (is (= "02949" (hid/encode {:alphabet "aeiouy0123456789"} [12345]))))

@@ -192,15 +192,14 @@
 
 (defn encode
   "Encodes a seq of positive integers <nums> (presumably ids)
-   into a `hashids` String (per <opts>)."
+   into a `hashids` String (per <opts>). Avoid passing in empty <nums>."
   [opts nums]
-  {:pre [(seq nums)
-         (every? nat-int? nums)]}
+  {:pre [(every? nat-int? nums)]}
   (-> (encode-intern opts nums)
       :hash-str))
 
 (defn decode
-  "Decodes a hashids String into a vector of positive integers."
+  "Decodes a hashids String into a vector of positive integer(s)."
   [opts ^String encoded]
   {:pre [(seq encoded)]}
   (let [{:keys [seps alphabet salt guards]} (setup opts)

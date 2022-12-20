@@ -145,9 +145,9 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
             }
             // we're finally ready to generate the actual bytes
             if (seq < 4096) // we have 12 bits available (i.e. 2^12)
-             return new UUIDV7(genBytes(nowMilli, Integer.toBinaryString(seq)));
+                return new UUIDV7(genBytes(nowMilli, Integer.toBinaryString(seq)));
             else // counter overflow (highly unlikely) - pretend we're on the next clock tick
-             return new UUIDV7(genBytes(nowMilli + 1, "0"));
+                return new UUIDV7(genBytes(nowMilli + 1, "0"));
         };
     }
 
@@ -180,7 +180,7 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-      int read = in.read(raw);
+        int read = in.read(raw);
         if (read != SIZE)
             throw new IllegalStateException("Not enough bytes read: " + read);
 

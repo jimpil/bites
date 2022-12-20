@@ -21,7 +21,7 @@
    access to the raw bytes of the object, nor the 1-arg ctor (they are
    both declared private)."
   ^UUIDV7 [^bytes bs]
-  (let [bos (ByteArrayOutputStream.)
+  (let [bos (ByteArrayOutputStream. 16)
         oos (ObjectOutputStream. bos)]
     (.write oos bs)
     (.flush oos)

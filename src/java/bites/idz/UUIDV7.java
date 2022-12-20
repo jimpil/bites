@@ -25,11 +25,7 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
     private static final int SIZE = 16;
     private static final SecureRandom randomSource = new SecureRandom();
 
-    public UUIDV7(byte[] raw) {
-        if (raw.length != SIZE)
-            throw new IllegalArgumentException("Invalid number of raw bytes: " + raw.length);
-        this.raw = raw;
-    }
+    private UUIDV7(byte[] raw) { this.raw = raw; }
     public UUIDV7() { // need this for Externalizable
       this(new byte[SIZE]);
     }

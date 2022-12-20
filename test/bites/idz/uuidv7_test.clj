@@ -8,7 +8,7 @@
   (let [u1  (uuidv7/generate)
         bos (ByteArrayOutputStream.)
         _   (-> (ObjectOutputStream. bos)
-                (.writeObject  u1))
+                (.writeObject u1))
         written-bytes (.toByteArray bos)
         u2 (->> written-bytes
                 (ByteArrayInputStream. )

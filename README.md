@@ -126,6 +126,7 @@ for reading **local** resources larger than 2GB into a sequence of byte-arrays.
 
 ## Requirements
 - Java 11+
+- Clojure 1.9+
 
 ## License
 

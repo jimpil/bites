@@ -38,9 +38,9 @@
    "0000ffffa1"                         {:encoding :b16} ;; 5 bytes
    "00010101"                           {:encoding :b2}  ;; 1 byte
    (str (UUID/randomUUID))              {:encoding :uuid}
-   (str (uuidv7/new-id))                {:encoding :uuidv7}
-   (UUID/randomUUID)                     nil
-   (uuidv7/new-id)                       nil
+   (str (uuidv7/generate))              {:encoding :uuidv7}
+   (UUID/randomUUID)                    nil
+   (uuidv7/generate)                    nil
    })
 
 (deftest round-tripping

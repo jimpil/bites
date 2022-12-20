@@ -5,7 +5,7 @@
            (bites.idz UUIDV7)))
 
 (deftest externalisable
-  (let [u1  (uuidv7/new-id)
+  (let [u1  (uuidv7/generate)
         bos (ByteArrayOutputStream.)
         _   (-> (ObjectOutputStream. bos)
                 (.writeObject  u1))
@@ -20,13 +20,13 @@
   )
 
 (deftest comparable
-  (let [gen-id! (uuidv7/batch-generator)
+  (let [gen-id! (uuidv7/generator)
         uuids   (repeatedly 100 gen-id!)
         sorted (sort uuids)]
     (is (= uuids sorted))
     (is (= (map str uuids) (map str sorted)))))
 
 (deftest static-from-string
-  (let [u1 (uuidv7/new-id)
+  (let [u1 (uuidv7/generate)
         u2 (UUIDV7/fromString (str u1))]
     (is (= u1 u2))))

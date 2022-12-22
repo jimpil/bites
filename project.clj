@@ -1,4 +1,4 @@
-(defproject bites "0.3.7-SNAPSHOT"
+(defproject bites "0.3.7"
   :description "Utilities for converting stuff to/from bytes + NIO extensions to `clojure.java.io` + CBOR support."
   :url "https://github.com/jimpil/bites"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"

@@ -70,7 +70,7 @@
   ^long [^UUIDV7 u]
   (let [bs   (.toByteArray u)
         bits (util/bytes->bits bs)
-        counter-bits (subs bits 4)] ;; drop the 4 VERSION bits
+        counter-bits (subs bits 52 65)]
     (Long/parseLong counter-bits 2)))
 
 

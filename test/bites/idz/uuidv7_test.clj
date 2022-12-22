@@ -32,3 +32,14 @@
   (let [u1 (uuidv7/generate)
         u2 (UUIDV7/fromString (str u1))]
     (is (= u1 u2))))
+
+(deftest seq-counter-tests
+  (testing "counter always increases when timestamps collide"
+    (let [gen-id! (uuidv7/generator)
+          collision-groups (->> (repeatedly 200 gen-id!)
+                                (map (juxt uuidv7/created-at uuidv7/seq-counter))
+                                (partition-by first))]
+      (doseq [group collision-groups]
+        (is (apply < (map second group)))))
+    )
+  )

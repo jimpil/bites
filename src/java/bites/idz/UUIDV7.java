@@ -100,18 +100,18 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
 
     /**
      *
-     * @return a random int from 0 (inclusive) to 4096 (exclusive)
+     * @return a random int from 0 (inclusive) to 2048 (exclusive)
      */
     private static int randomCounter(){
-        return new BigInteger(12, randomSource).intValue();
+        return new BigInteger(11, randomSource).intValue();
     }
 
     /**
      *
-     * @return a random int from 0 (inclusive) to 16 (exclusive)
+     * @return a random int from 0 (inclusive) to 32 (exclusive)
      */
     public static int randomIncrement(){
-        return new BigInteger(4, randomSource).intValue();
+        return new BigInteger(5, randomSource).intValue();
     }
 
     /**
@@ -125,15 +125,18 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
 
     /**
      *
-     * @param clockDriftAllowance the minimum number of nanoseconds the clock is allowed to drift (into the past)
-     *                            before it is considered an illegal state. For example, a value of 10 seconds means
-     *                            that any drift (into the past) greater than 10 seconds is considered 'machine-wide',
-     *                            and so the internal state is reset, whereas for a drift less than 10 seconds,
-     *                            an IllegalStateException is thrown.
+     * @param clockDriftCutOff
+     * The minimum number of nanoseconds the clock is allowed to drift (into the past)
+     * before it is considered an illegal state. For example, a value of 10 seconds means
+     * that any drift (into the past) greater than 10 seconds is considered 'machine-wide',
+     * and so the internal state is reset, whereas for a drift less than 10 seconds,
+     * an IllegalStateException is thrown. A value of 0 essentially means 'never-throw'
+     * (any drift into the past is valid).
+     *
      * @return a Supplier of UUIDV7 objects with monotonically increasing counter bits.
      * The values supplied are guaranteed to be sortable, even in the face of timestamp collisions.
      */
-    public static Supplier<UUIDV7> supplier (long clockDriftAllowance){
+    public static Supplier<UUIDV7> supplier (long clockDriftCutOff){
         AtomicLong prevTS = new AtomicLong(-1);
         AtomicInteger counter = new AtomicInteger(0); // Monotonic Random (Method 2)
 
@@ -154,17 +157,15 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
             else {
                 // seems like the clock has moved back
                 // https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-04.html#section-6.1-2.10
-                long diff = Duration.between(Instant.ofEpochMilli(previousMilli) , now).toNanos();
-                if (diff > clockDriftAllowance){ // NANOS_PER_SECOND
-                    // clock moved back by more than allowed (e.g. 10 seconds) - this is bad!
+                long diff = Duration.between(Instant.ofEpochMilli(previousMilli), now).toNanos();
+                if (diff > clockDriftCutOff){
+                    // clock moved back by more than the cutoff (e.g. 10 seconds) - this is bad!
                     // something must have happened to the machine - reset everything
                     prevTS.set(nowMilli);
                     counter.set(randomCounter());
                 }
-                // clock moved back by less than 10 seconds
-                // not sure how this can happen and/or what to do
-                else
-                    throw new IllegalStateException("Clock seems to have moved back by less than 10 seconds (not long enough to consider it machine-wide)!");
+                else // clock moved back by less than the cutoff - throw
+                    throw new IllegalStateException("Clock seems to have moved back by less than " + clockDriftCutOff + " nanos.");
 
             }
             final int seq = counter.get();
@@ -173,7 +174,9 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
             if (seq < 4096) // we have 12 bits available (i.e. 2^12)
                 return new UUIDV7(genBytes(nowMilli, Integer.toBinaryString(seq)));
             else {
-                // counter overflow - produce on the next available tick with the minimum possible counter
+                // counter overflow - extremely unlikely because the counter starts at less than 2048,
+                // and increments by less than 32 each time (it would take hundreds of increments to reach 4096)
+                // if it does happen pretend we're on the next available tick and use the minimum possible counter
                 counter.set(0);
                 return new UUIDV7(genBytes(nowMilli + 1, "0"));
             }
@@ -181,7 +184,7 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
     }
 
     public static Supplier<UUIDV7> supplier (){
-        return supplier(10 * 1000_000_000L);
+        return supplier(10 * 1000_000_000L); // // NANOS_PER_SECOND
     }
 
     private static void checkVersion(int x){

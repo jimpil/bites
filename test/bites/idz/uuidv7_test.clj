@@ -21,10 +21,10 @@
 
 (deftest comparable
   (let [gen-id! (uuidv7/generator)
-        uuids   (repeatedly 100 gen-id!)
-        unique (set uuids)
+        uuids   (repeatedly 200 gen-id!)
+        unique  (set uuids)
         sorted  (sort unique)]
-    (is (== 100 (count unique)))
+    (is (== 200 (count unique)))
     (is (= uuids sorted))
     (is (= (map str uuids) (map str sorted)))))
 

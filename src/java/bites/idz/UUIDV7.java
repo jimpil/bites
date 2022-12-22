@@ -100,6 +100,22 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
 
     /**
      *
+     * @return a random int from 0 (inclusive) to 4096 (exclusive)
+     */
+    private static int randomCounter(){
+        return new BigInteger(12, randomSource).intValue();
+    }
+
+    /**
+     *
+     * @return a random int from 0 (inclusive) to 16 (exclusive)
+     */
+    public static int randomIncrement(){
+        return new BigInteger(4, randomSource).intValue();
+    }
+
+    /**
+     *
      * @return a new UUIDV7 object with random counter bits.
      * Avoid using this for generating ids in quick succession, or in parallel.
      */
@@ -109,33 +125,41 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
 
     /**
      *
+     * @param clockDriftAllowance the minimum number of nanoseconds the clock is allowed to drift (into the past)
+     *                            before it is considered an illegal state. For example, a value of 10 seconds means
+     *                            that any drift (into the past) greater than 10 seconds is considered 'machine-wide',
+     *                            and so the internal state is reset, whereas for a drift less than 10 seconds,
+     *                            an IllegalStateException is thrown.
      * @return a Supplier of UUIDV7 objects with monotonically increasing counter bits.
      * The values supplied are guaranteed to be sortable, even in the face of timestamp collisions.
      */
-    public static Supplier<UUIDV7> supplier (){
+    public static Supplier<UUIDV7> supplier (long clockDriftAllowance){
         AtomicLong prevTS = new AtomicLong(-1);
-        AtomicInteger counter = new AtomicInteger(0); // a bit of an overkill for 12 bits still :(
+        AtomicInteger counter = new AtomicInteger(0); // Monotonic Random (Method 2)
 
         return () -> {
             Instant now = Instant.now();
             long nowMilli = now.toEpochMilli();
             long previousMilli = prevTS.get();
-            int seq;
+
             if (nowMilli == previousMilli)
-                seq = counter.getAndIncrement();
+                //  The increment value for every UUID generation SHOULD be
+                //  a random integer  of any desired length larger than zero
+                counter.addAndGet(Math.max(1, randomIncrement())); // 1 - 15
             else if (nowMilli > previousMilli) {
+                // the very first call will land here
                 prevTS.set(nowMilli);
-                counter.set(seq = 0);
+                counter.set(randomCounter());
             }
             else {
                 // seems like the clock has moved back
                 // https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-04.html#section-6.1-2.10
                 long diff = Duration.between(Instant.ofEpochMilli(previousMilli) , now).toNanos();
-                if (diff > 10 * 1000_000_000L){ // NANOS_PER_SECOND
-                    // clock moved back by more than 10 seconds - this is bad!
+                if (diff > clockDriftAllowance){ // NANOS_PER_SECOND
+                    // clock moved back by more than allowed (e.g. 10 seconds) - this is bad!
                     // something must have happened to the machine - reset everything
                     prevTS.set(nowMilli);
-                    counter.set(seq = 0);
+                    counter.set(randomCounter());
                 }
                 // clock moved back by less than 10 seconds
                 // not sure how this can happen and/or what to do
@@ -143,23 +167,43 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
                     throw new IllegalStateException("Clock seems to have moved back by less than 10 seconds (not long enough to consider it machine-wide)!");
 
             }
+            final int seq = counter.get();
+            //System.out.println(seq);
             // we're finally ready to generate the actual bytes
             if (seq < 4096) // we have 12 bits available (i.e. 2^12)
                 return new UUIDV7(genBytes(nowMilli, Integer.toBinaryString(seq)));
-            else // counter overflow (highly unlikely) - pretend we're on the next clock tick
+            else {
+                // counter overflow - produce on the next available tick with the minimum possible counter
+                counter.set(0);
                 return new UUIDV7(genBytes(nowMilli + 1, "0"));
+            }
         };
     }
 
+    public static Supplier<UUIDV7> supplier (){
+        return supplier(10 * 1000_000_000L);
+    }
+
+    private static void checkVersion(int x){
+        if (!Integer.toBinaryString(x).startsWith("111"))
+            throw new IllegalStateException("Version mismatch - this is NOT a version 7 UUID!");
+    }
+
     public static UUIDV7 fromString (String s){
-        assert (s.length() == 36);
+        if (s.length() != 36)
+            throw new IllegalArgumentException("UUID textual representation should be 36 characters long.");
 
         String noDashes = s.replace("-","");
         byte[] raw = new byte[SIZE];
         for (int i=0; i < SIZE; i++){
+            // get the right 2-char slice (1 byte = 2 chars in hex)
             String octet = noDashes.substring(2*i , 2*(i + 1));
+            // parse to in an unsigned byte
             int parsed = Integer.parseInt(octet, 16);
-            int ret = parsed >  127 ? parsed - 256 : parsed;
+            // check the 7th byte for correct version (i.e. 0111)
+            if (i == 6) checkVersion(parsed);
+            // convert it to a signed byte
+            int ret = parsed > Byte.MAX_VALUE ? parsed - 256 : parsed;
             raw[i] = (byte)ret;
         }
         return new UUIDV7(raw);

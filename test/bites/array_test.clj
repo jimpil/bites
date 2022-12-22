@@ -5,7 +5,8 @@
             [clojure.test.check.clojure-test :refer [defspec]]
             [bites.array :refer :all]
             [bites.util :as ut]
-            [bites.idz.uuidv7 :as uuidv7])
+            [bites.idz.uuidv7 :as uuidv7]
+            [clojure.test.check.rose-tree :as rose])
   (:import (java.nio.charset StandardCharsets)
            (java.util UUID Arrays)
            (org.apache.commons.codec.binary Hex BinaryCodec)
@@ -100,16 +101,23 @@
   (prop/for-all [v (gen/fmap str gen/uuid)]
     (= v (round-trip* v {:encoding :uuid}))))
 
+(defonce gen-uuidv7
+  (let [gen! (uuidv7/generator)]
+    (gen/no-shrink
+      (gen/->Generator
+        (fn [_rng _size]
+          (rose/make-rose (gen!) []))))))
+
 (defspec gen-uuidV7 default-runs
-  ;; reusing/abusing the built-in uuidv4 generator
-  ;; don't care about the true contents in this test
-  (prop/for-all [v (gen/fmap (comp uuidv7/from-string str) gen/uuid)]
+  (prop/for-all [v (gen/fmap (comp uuidv7/from-string str)
+                             gen-uuidv7)]
     (= v (round-trip* v nil))))
 
 (defspec gen-uuidV7-str default-runs
   ;; reusing/abusing the built-in uuidv4 generator
   ;; don't care about the true contents in this test
-  (prop/for-all [v (gen/fmap (comp str uuidv7/from-string str) gen/uuid)]
+  (prop/for-all [v (gen/fmap (comp str uuidv7/from-string str)
+                             gen-uuidv7)]
     (= v (round-trip* v {:encoding :uuidv7}))))
 
 (defspec gen-byte-channel default-runs

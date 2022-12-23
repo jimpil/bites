@@ -39,12 +39,12 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
         return pad + bits;
     }
 
-    private static byte[] bitsToBytes (String bits){
-        int bitsLength = bits.length();
+    private static byte[] bitsToBytes (final String bits){
+        final int bitsLength = bits.length();
         if (bitsLength % 8 != 0)
             throw new IllegalArgumentException("<bits> length is not cleanly divisible by 8: " + bitsLength);
-        int bytesNumber = bitsLength / 8;
-        byte[] ret = new byte[bytesNumber];
+        final int bytesNumber = bitsLength / 8;
+        final byte[] ret = new byte[bytesNumber];
         for (int i=0; i<bytesNumber; i++){
             int startIdx = i*8;
             String byteBits = bits.substring(startIdx, startIdx+8);
@@ -54,9 +54,9 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
         return ret;
     }
 
-    private static String randomBits (int n){
-        BigInteger randomNum = new BigInteger(n, randomSource);
-        String bits = randomNum.toString(2);
+    private static String randomBits (final int n){
+        final BigInteger randomNum = new BigInteger(n, randomSource);
+        final String bits = randomNum.toString(2);
         return (n > bits.length() ? padBits(bits, n) : bits);
     }
 
@@ -77,9 +77,9 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
      * @param counterBits - The bits of the counter (if there is one), or null
      * @return The 16 bytes that will make up this UUID
      */
-    private static byte[] genBytes (long epochMilli, String counterBits){
+    private static byte[] genBytes (final long epochMilli, final String counterBits){
         String tsBits = Long.toBinaryString(epochMilli);
-        int tsBitsLength = tsBits.length(); // this can't be more than 64
+        final int tsBitsLength = tsBits.length(); // this can't be more than 64
 
         // https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-04.html#section-6.1-2.14
         if (tsBitsLength > UNIX_TS_MS_BIT_COUNT)
@@ -91,8 +91,8 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
             // pad the most significant bits
            tsBits = padBits(tsBits, UNIX_TS_MS_BIT_COUNT);
 
-        String randA = counterBits == null ? randomBits(12) : padBits(counterBits, 12);
-        String randB = randomBits(62);
+        final String randA = counterBits == null ? randomBits(12) : padBits(counterBits, 12);
+        final String randB = randomBits(62);
 
         return bitsToBytes(tsBits + VERSION_BITS + randA + VARIANT_BITS + randB);
 
@@ -136,14 +136,14 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
      * @return a Supplier of UUIDV7 objects with monotonically increasing counter bits.
      * The values supplied are guaranteed to be sortable, even in the face of timestamp collisions.
      */
-    public static Supplier<UUIDV7> supplier (long clockDriftCutOff){
-        AtomicLong prevTS = new AtomicLong(-1);
-        AtomicInteger counter = new AtomicInteger(0); // Monotonic Random (Method 2)
+    public static Supplier<UUIDV7> supplier (final long clockDriftCutOff){
+        final AtomicLong prevTS = new AtomicLong(-1);
+        final AtomicInteger counter = new AtomicInteger(0); // Monotonic Random (Method 2)
 
         return () -> {
-            Instant now = Instant.now();
-            long nowMilli = now.toEpochMilli();
-            long previousMilli = prevTS.get();
+            final Instant now = Instant.now();
+            final long nowMilli = now.toEpochMilli();
+            final long previousMilli = prevTS.get();
 
             if (nowMilli == previousMilli)
                 //  The increment value for every UUID generation SHOULD be
@@ -187,17 +187,17 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
         return supplier(10 * 1000_000_000L); // // NANOS_PER_SECOND
     }
 
-    private static void checkVersion(int x){
+    private static void checkVersion(final int x){
         if (!Integer.toBinaryString(x).startsWith("111"))
             throw new IllegalStateException("Version mismatch - this is NOT a version 7 UUID!");
     }
 
-    public static UUIDV7 fromString (String s){
+    public static UUIDV7 fromString (final String s){
         if (s.length() != 36)
             throw new IllegalArgumentException("UUID textual representation should be 36 characters long.");
 
         String noDashes = s.replace("-","");
-        byte[] raw = new byte[SIZE];
+        final byte[] raw = new byte[SIZE];
         for (int i=0; i < SIZE; i++){
             // get the right 2-char slice (1 byte = 2 chars in hex)
             String octet = noDashes.substring(2*i , 2*(i + 1));
@@ -234,7 +234,7 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
     }
 
     @Override
-    public int compareTo(UUIDV7 o) {
+    public int compareTo(final UUIDV7 o) {
         int ret;
         byte[] otherBS = o.toByteArray();
         BigInteger thisTS  = new BigInteger(1, Arrays.copyOfRange(raw, 0 ,6));
@@ -264,11 +264,11 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
     }
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder(36);
+        final StringBuilder sb = new StringBuilder(36);
         for (int i=0; i<SIZE; i++){
             String hexDigits = Integer.toHexString(Byte.toUnsignedInt(raw[i]));
             sb.append(hexDigits.length() == 1 ? "0" + hexDigits : hexDigits);
-            int length = sb.length();
+            final int length = sb.length();
             if (length == 8 || length == 13 || length == 18 || length == 23)
                 sb.append('-');
 

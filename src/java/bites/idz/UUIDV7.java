@@ -264,16 +264,14 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
     }
     @Override
     public String toString() {
-        int sidx = 0;
         StringBuilder sb = new StringBuilder(36);
         for (int i=0; i<SIZE; i++){
             String hexDigits = Integer.toHexString(Byte.toUnsignedInt(raw[i]));
             sb.append(hexDigits.length() == 1 ? "0" + hexDigits : hexDigits);
-            sidx+=2;
-            if (sidx == 8 || sidx == 13 || sidx == 18 || sidx == 23){
+            int length = sb.length();
+            if (length == 8 || length == 13 || length == 18 || length == 23)
                 sb.append('-');
-                sidx++;
-            }
+
         }
         return sb.toString();
     }

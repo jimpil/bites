@@ -34,8 +34,8 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
         return raw.clone();
     }
 
-    private static String padBits (String bits, int targetLength){
-        String pad = "0".repeat(targetLength - bits.length());
+    private static String padBits (final String bits, final int targetLength){
+        final String pad = "0".repeat(targetLength - bits.length());
         return pad + bits;
     }
 
@@ -43,6 +43,7 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
         final int bitsLength = bits.length();
         if (bitsLength % 8 != 0)
             throw new IllegalArgumentException("<bits> length is not cleanly divisible by 8: " + bitsLength);
+
         final int bytesNumber = bitsLength / 8;
         final byte[] ret = new byte[bytesNumber];
         for (int i=0; i<bytesNumber; i++){
@@ -83,8 +84,8 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
 
         // https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-04.html#section-6.1-2.14
         if (tsBitsLength > UNIX_TS_MS_BIT_COUNT)
-            // keep the 48 least significant bits
-            tsBits = tsBits.substring(tsBitsLength - UNIX_TS_MS_BIT_COUNT);
+            // truncate the least significant bits
+            tsBits = tsBits.substring(0, UNIX_TS_MS_BIT_COUNT);
 
         // https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-04.html#section-6.1-2.12
         if (tsBitsLength < UNIX_TS_MS_BIT_COUNT)

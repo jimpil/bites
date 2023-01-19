@@ -25,9 +25,12 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
     private static final int SIZE = 16;
     private static final SecureRandom randomSource = new SecureRandom();
 
-    private UUIDV7(byte[] raw) { this.raw = raw; }
+    private UUIDV7(byte[] raw) {
+        checkVersion(raw[6]);
+        this.raw = raw;
+    }
     public UUIDV7() { // need this for Externalizable
-      this(new byte[SIZE]);
+      this.raw = new byte[SIZE];
     }
 
     public byte[] toByteArray() {
@@ -126,6 +129,18 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
 
     /**
      *
+     * @param epochMillis The standard UNIX epoch-millis (per `Instant.toEpochMilli`)
+     * @return a new UUIDV7 with the first 6 bytes populated per the provided `epochMillis`,
+     * and random counter bits. This means that the burden of time collisions
+     * falls on you if you choose to bulk generate from this. Choosing a starting point,
+     * and incrementing `epochMillis` on each invocation would work.
+     */
+    public static UUIDV7 ofEpochMilli(final long epochMillis){
+        return new UUIDV7(genBytes(epochMillis, null));
+    }
+
+    /**
+     *
      * @param clockDriftCutOff
      * The minimum number of nanoseconds the clock is allowed to drift (into the past)
      * before it is considered an illegal state. For example, a value of 10 seconds means
@@ -202,10 +217,10 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
         for (int i=0; i < SIZE; i++){
             // get the right 2-char slice (1 byte = 2 chars in hex)
             String octet = noDashes.substring(2*i , 2*(i + 1));
-            // parse to in an unsigned byte
+            // parse to an unsigned byte
             int parsed = Integer.parseInt(octet, 16);
             // check the 7th byte for correct version (i.e. 0111)
-            if (i == 6) checkVersion(parsed);
+            // if (i == 6) checkVersion(parsed);
             // convert it to a signed byte
             int ret = parsed > Byte.MAX_VALUE ? parsed - 256 : parsed;
             raw[i] = (byte)ret;
@@ -214,10 +229,7 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
     }
 
     public Instant createdAt() {
-        return Instant.ofEpochMilli(
-                new BigInteger(1, Arrays.copyOfRange(raw, 0 ,6))
-                        .longValue()
-        );
+        return Instant.ofEpochMilli(new BigInteger(1, Arrays.copyOfRange(raw, 0 ,6)).longValue());
     }
 
     @Override
@@ -228,27 +240,29 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
 
     @Override
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        int read = in.read(raw);
-        if (read != SIZE)
-            throw new IllegalStateException("Not enough bytes read: " + read);
+        int nread = in.read(raw);
+        if (nread != SIZE)
+            throw new IllegalStateException("Not enough bytes read: " + nread);
 
     }
 
     @Override
     public int compareTo(final UUIDV7 o) {
-        int ret;
-        byte[] otherBS = o.toByteArray();
-        BigInteger thisTS  = new BigInteger(1, Arrays.copyOfRange(raw, 0 ,6));
-        BigInteger otherTS = new BigInteger(1, Arrays.copyOfRange(otherBS, 0, 6));
-        int tsRet = thisTS.compareTo(otherTS);
-        ret = tsRet;
+        return Arrays.compareUnsigned(raw, 0, 8, o.toByteArray(), 0, 8);
 
-        if (tsRet == 0) { // we've hit a collision - use counter
-            BigInteger thisSeq  = new BigInteger(1, Arrays.copyOfRange(raw, 6 ,8));
-            BigInteger otherSeq = new BigInteger(1, Arrays.copyOfRange(otherBS, 6, 8));
-            ret = thisSeq.compareTo(otherSeq);
-        }
-        return ret;
+//        int ret;
+//        byte[] otherBS = o.toByteArray();
+//        BigInteger thisTS  = new BigInteger(1, Arrays.copyOfRange(raw, 0 ,6));
+//        BigInteger otherTS = new BigInteger(1, Arrays.copyOfRange(otherBS, 0, 6));
+//        int tsRet = thisTS.compareTo(otherTS);
+//        ret = tsRet;
+//
+//        if (tsRet == 0) { // we've hit a collision - use counter
+//            BigInteger thisSeq  = new BigInteger(1, Arrays.copyOfRange(raw, 6, 8));
+//            BigInteger otherSeq = new BigInteger(1, Arrays.copyOfRange(otherBS, 6, 8));
+//            ret = thisSeq.compareTo(otherSeq);
+//        }
+//        return ret;
     }
 
     @Override
@@ -259,7 +273,7 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
     @Override
     public boolean equals(Object o) {
         if (o instanceof UUIDV7)
-            return Arrays.equals(raw, ((UUIDV7) o).toByteArray());
+            return this == o || Arrays.equals(raw, ((UUIDV7) o).toByteArray());
         else
             return false;
     }

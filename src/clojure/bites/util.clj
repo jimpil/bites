@@ -24,14 +24,15 @@
 (defn octal-bytes
   ^bytes [^String s]
   {:pre [(false? (.isEmpty s))]}
-  (let [bi (BigInteger. s 8)]
-    (.toByteArray bi)))
+  (-> s
+      (BigInteger. 8)
+      .toByteArray))
 
 (defn octal-str
   ^String [^bytes bs]
   {:pre [(pos? (alength bs))]}
-  (let [bi (BigInteger. bs)]
-    (.toString bi 8)))
+  (-> (BigInteger. bs)
+      (.toString  8)))
 
 (defn b64-str
   "Encodes the provided byte-array <bs> in Base64.
@@ -66,7 +67,7 @@
   [b]
   (let [hex (->> (byte b) Byte/toUnsignedInt Integer/toHexString)]
     (cond->> hex
-             (= 1 (count hex))
+             (== 1 (count hex))
              (str \0))))
 
 (defn hex->byte
@@ -111,19 +112,18 @@
         padding (- ret-length (.length ret))]
     (if (zero? padding)
       ret
-      (str/join (concat (repeat padding \0) ret)))))
+      (str (.repeat "0" padding) ret))))
 
 (defn binary-bytes
   "Decodes the provided String <bs> from Base2 (i.e. binary).
    If the length of <s> is not cleanly divisible by 8,
    any excess bits will be ignored. Returns byte-array."
   ^bytes [^String bit-str]
-  {:pre [(-> bit-str count (rem 8) zero?)]}
+  ;{:pre [(-> bit-str count (rem 8) zero?)]}
   (->> bit-str
        (partition 8)
        (map (fn [bits]
-              (let [i (-> (str/join bits)
-                          (Integer/parseInt 2))]
+              (let [i (-> bits str/join (Integer/parseInt 2))]
                 (cond-> i
                         (> i Byte/MAX_VALUE)
                         (- const/MAX_UNSIGNED_BYTE)))))
@@ -131,18 +131,6 @@
 
 (defmacro current-thread-interrupted? []
   `(.isInterrupted (Thread/currentThread)))
-
-(defn bits->bytes
-  ^bytes [^String bits]
-  {:pre [(-> bits count (rem 8) zero?)]}
-  (->> bits
-       (partition 8)
-       (map (fn [bits]
-              (let [i (-> (str/join bits)
-                          (Integer/parseInt 2))]
-                (cond-> i (> i 127)
-                        (- const/MAX_UNSIGNED_BYTE)))))
-       byte-array))
 
 (defn pad-bits
   [^long target-length ^String bits]
@@ -406,3 +394,9 @@
              persistent!
              (partition-by first)
              (mapv (partial map second)))))))
+
+
+(comment
+
+  (seq (octal-bytes "31646541")) ;; => (103, 77, 97)
+  )

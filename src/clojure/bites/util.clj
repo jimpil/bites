@@ -17,6 +17,47 @@
   ([^StringBuilder sb]   (.toString sb))   ;; complete
   ([^StringBuilder sb x] (.append sb x)))  ;; accumulate
 
+(defn ab-divide
+  "Calculates a sequence of tokens (from alphabet) for a byte array."
+  [^String alphabet ^bytes bs]
+  (let [base (count alphabet)]
+    (loop [n (bigint (BigInteger. 1 bs))
+           tokens (list)]
+      (if (< n base)
+        (conj tokens (.charAt alphabet (int n)))
+        (let [digit (mod n base)]
+          (recur
+            (/ (- n digit) base)
+            (conj tokens (.charAt alphabet (int digit)))))))))
+
+(defn ab-multiply
+  "Uses optimized big-integer multiplication to decode a sequence of byte
+  values from a string of tokens. Only works in Clojure!"
+  [^String alphabet tokens]
+  ;; Bigint math: ~74 µs
+  (let [data (->> (reverse tokens)
+                  (map vector (iterate (partial * (count alphabet)) 1N))
+                  ^clojure.lang.BigInt
+                  (reduce
+                    (fn read-token
+                      [n [base token]]
+                      (let [digit (.indexOf alphabet (str token))]
+                        (if (neg? digit)
+                          (throw (ex-info
+                                   (str "Invalid token: " (pr-str token)
+                                        " is not in alphabet " (pr-str alphabet))
+                                   {:alphabet alphabet
+                                    :token token}))
+                          (+ n (* (bigint digit) base)))))
+                    0N)
+                  .toBigInteger
+                  .toByteArray)]
+    (if (and (> (alength data) 1)
+             (zero? (aget data 0))
+             (neg? (aget data 1)))
+      (vec (next data))
+      (vec data))))
+
 (defn find-first
   [pred coll]
   (some #(when (pred %) %) coll))
@@ -33,6 +74,26 @@
   {:pre [(pos? (alength bs))]}
   (-> (BigInteger. bs)
       (.toString  8)))
+
+(defn b58-str
+  [^bytes bs]
+  (let [zeroes (count (take-while zero? bs))]
+    (->>
+      (when (< zeroes (alength bs))
+        (ab-divide const/B58-alphabet bs))
+      (concat (repeat zeroes (first const/B58-alphabet)))
+      (apply str))))
+
+(defn b58-bytes
+  [^String s]
+  (let [zeroes (count (take-while #{(first const/B58-alphabet)} s))]
+    (if (== zeroes (count s))
+      (byte-array zeroes)
+      (let [byte-seq (ab-multiply const/B58-alphabet s)
+            data (byte-array (+ zeroes (count byte-seq)))]
+        (dotimes [i (count byte-seq)]
+          (aset data (+ zeroes i) (byte (nth byte-seq i))))
+        data))))
 
 (defn b64-str
   "Encodes the provided byte-array <bs> in Base64.
@@ -51,8 +112,8 @@
 (defn b64-bytes
   "Decodes the provided String <s> from Base64.
    Returns byte-array."
-  (^bytes [bs]
-   (b64-bytes bs nil))
+  (^bytes [s]
+   (b64-bytes s nil))
   (^bytes [^String s input-type]
    (case input-type
      :url (-> (Base64/getUrlDecoder)

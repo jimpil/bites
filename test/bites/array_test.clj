@@ -74,6 +74,12 @@
   (prop/for-all [v gen/string]
     (= v (round-trip* v {:encoding "UTF-8"}))))
 
+(defspec gen-b58-string default-runs
+  (prop/for-all [v (gen/fmap
+                     #(if (empty? %) "1" (ut/b58-str %))
+                     gen/bytes)]
+    (= v (round-trip* v {:encoding :b58}))))
+
 (defspec gen-hex-string default-runs
   (prop/for-all [v (gen/fmap ;; use external lib during testing
                      #(Hex/encodeHexString ^bytes %)

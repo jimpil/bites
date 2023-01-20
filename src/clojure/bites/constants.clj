@@ -27,5 +27,6 @@
 (def ^:const bs (byte 0x5C))         ; backslash
 (def ^:const ^chars CC (char-array [\C \C]))  ; [\C \C]  (Characters)
 (def ^:const ^chars FF (char-array [\F \F]))  ; [\F \F]  (Characters)
+(def ^:const ^String B58-alphabet "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
 
 

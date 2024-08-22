@@ -8,7 +8,7 @@
                  [com.fasterxml.jackson.dataformat/jackson-dataformat-cbor "2.14.0"]]
   :source-paths      ["src/clojure"]
   :java-source-paths ["src/java"]
-  :javac-options ["-target" "11" "-source" "11"]
+  :javac-options ["--release" "11"]
   :profiles
   {:dev {:dependencies [;; for testing
                         [org.clojure/test.check "1.1.1"]

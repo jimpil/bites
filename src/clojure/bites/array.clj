@@ -5,7 +5,8 @@
              [util :as ut]
              [bin-string :as bin-string]]
             [clojure.java.io :as io])
-  (:import (java.nio ByteBuffer ReadOnlyBufferException CharBuffer)
+  (:import (com.fasterxml.jackson.databind.util ByteBufferBackedOutputStream)
+           (java.nio ByteBuffer ReadOnlyBufferException CharBuffer)
            (java.nio.charset Charset)
            (java.nio.channels FileChannel ReadableByteChannel Channels)
            (java.net URI URL)
@@ -190,15 +191,12 @@
 
   ByteBuffer
   (toBytes [this _]
-    (try
-      ;; one copy, but the ByteBuffer remains usable
-      (aclone (.array this))
-      (catch UnsupportedOperationException _
-        (byte-array 0))
-      (catch ReadOnlyBufferException _
-        (-> this
-            (io/make-output-stream nil)
-            (toBytes nil)))))
+    ;; a snapshot of the buffer's contents
+    ;; clears the mark (via `.rewind`)
+    (let [ret (byte-array (.position this))]
+      (.rewind this)
+      (.get this ret)
+      ret))
 
   CharBuffer
   (toBytes [this opts]

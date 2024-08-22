@@ -2,7 +2,8 @@
   (:require [clojure.test :refer :all]
             [bites.idz.uuidv7 :as uuidv7])
   (:import (java.io ObjectInputStream ByteArrayInputStream ByteArrayOutputStream ObjectOutputStream)
-           (bites.idz UUIDV7)))
+           (bites.idz UUIDV7)
+           [java.util UUID]))
 
 (deftest externalisable
   (let [u1  (uuidv7/generate)
@@ -29,13 +30,14 @@
     (is (= (map str uuids) (map str sorted)))))
 
 (deftest static-from-string
-  (doseq[u1 (repeatedly 100 uuidv7/generate)]
-    (is (= u1 (UUIDV7/fromString (str u1))))))
+  (doseq[^UUIDV7 u (repeatedly 100 uuidv7/generate)]
+    (is (instance? UUID (.asUUID u)))
+    (is (= u (UUIDV7/fromString (str u))))))
 
 (deftest seq-counter-tests
   (testing "counter always increases when timestamps collide"
     (let [gen-id! (uuidv7/generator)
-          collision-groups (->> (repeatedly 200 gen-id!)
+          collision-groups (->> (repeatedly 1250 gen-id!)
                                 (map (juxt uuidv7/created-at uuidv7/seq-counter))
                                 (partition-by first))]
       (doseq [group collision-groups]

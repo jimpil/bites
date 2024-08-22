@@ -3,35 +3,20 @@
             [bites.array :as array]
             [bites.bin-string :as bin-string])
   (:import (java.time Instant)
-           (java.io Writer ByteArrayInputStream ObjectInputStream ByteArrayOutputStream ObjectOutputStream)
-           (bites.idz UUIDV7)))
+           (java.io Writer)
+           (bites.idz UUIDV7)
+           [java.util UUID]))
 
 (defn from-string ^UUIDV7 [^String s] (UUIDV7/fromString s))
 (defn created-at ^Instant [^UUIDV7 u] (.createdAt u))
+(defn as-java-uuid ^UUID  [^UUIDV7 u] (.asUUID u))
 
 (extend-type UUIDV7
   array/ToByteArray
   (toBytes [this _]
     (.toByteArray this)))
 
-(defn- ->UUIDV7
-  "Returns a UUIDV7 instance given the provided (presumed 16) bytes.
-   Reuses the `.readExternal()` method and that's why there is a fair
-   bit of copying taking place. This is the price to pay for not giving
-   access to the raw bytes of the object, nor the 1-arg ctor (they are
-   both declared private)."
-  ^UUIDV7 [^bytes bs]
-  (let [bos (ByteArrayOutputStream. 16)
-        oos (ObjectOutputStream. bos)]
-    (.write oos bs)
-    (.flush oos)
-    (doto (UUIDV7.)
-      (.readExternal
-        (ObjectInputStream.
-          (ByteArrayInputStream.
-            (.toByteArray bos)))))))
-
-(defmethod array/fromBytes UUIDV7 [_ ^bytes bs _] (->UUIDV7 bs))
+(defmethod array/fromBytes UUIDV7 [_ ^bytes bs _] (UUIDV7/fromByteArray bs))
 (defmethod bin-string/from-bytes :uuidv7 [_ ^bytes bs _] (str (array/fromBytes UUIDV7 bs nil)))
 (defmethod bin-string/to-bytes   :uuidv7 [_ s _]  (-> s from-string (array/toBytes nil)))
 (defmethod print-method UUIDV7 [u ^Writer wrt] (->> (str "#uuidv7" \" u \") (.write wrt)))

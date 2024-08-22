@@ -6,7 +6,8 @@
             [bites.constants :as const]
             [bites.array :as array]
             [bites.util :as ut])
-  (:import (java.nio ByteBuffer CharBuffer)
+  (:import (com.fasterxml.jackson.databind.util ByteBufferBackedInputStream ByteBufferBackedOutputStream)
+           (java.nio ByteBuffer CharBuffer)
            (java.nio.channels ReadableByteChannel Channels WritableByteChannel FileChannel Pipe)
            (java.io InputStream OutputStream Writer File FileOutputStream FileInputStream Reader ByteArrayOutputStream)
            (java.nio.charset Charset CharsetEncoder)
@@ -41,29 +42,42 @@
   (do-copy input output opts))
 
 (extend-protocol io/IOFactory
-
   ByteBuffer
   (make-reader [this opts]
     (-> this
         (array/toBytes nil)
         (io/make-reader opts)))
-  (make-writer [this opts]
-    (-> this
-        (io/make-output-stream nil)
-        (io/make-writer opts)))
+  (make-writer [buff opts]
+    (proxy [Writer][]
+      (flush [] nil)
+      (close [] nil)
+      (write
+        ([^String s]
+         (.put buff (.getBytes s ^String (:encoding opts const/UTF-8))) nil)
+        ([^chars cs offset length]
+         (let [bb (-> opts
+                      (:encoding const/UTF-8)
+                      (Charset/forName)
+                      (.encode (CharBuffer/wrap cs)))]
+           (if (nil? offset)
+             (.put buff bb)
+             (let [bs (array/toBytes bb nil)]
+               (.put buff bs ^long offset ^long (or length (- (alength bs) offset)))))
+           nil)))))
+
   (make-input-stream [this opts]
     (-> this
         (array/toBytes nil)
         (io/make-input-stream opts)))
-  (make-output-stream [this _]
-    (if (.hasArray this)
-      (let [arr (.array this)]
-        (doto (ByteArrayOutputStream. (alength arr))
-          (.write arr)))
-      (let [bout    (ByteArrayOutputStream.)
-            channel (Channels/newChannel bout)]
-        (.write channel this)
-        bout)))
+  (make-output-stream [buff opts]
+    (proxy [OutputStream][]
+      (write
+        ([b] (.put buff (byte b))) ;; must override this
+        ([^bytes bs offset length] ;; but prefer this
+         (if (nil? offset)
+           (.put buff bs)
+           (.put buff bs ^long offset ^long (or length (- (alength bs) offset))))
+         nil))))
 
   ReadableByteChannel
   (make-reader [this opts]

@@ -5,10 +5,12 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -219,13 +221,15 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
             String octet = noDashes.substring(2*i , 2*(i + 1));
             // parse to an unsigned byte
             int parsed = Integer.parseInt(octet, 16);
-            // check the 7th byte for correct version (i.e. 0111)
-            // if (i == 6) checkVersion(parsed);
             // convert it to a signed byte
             int ret = parsed > Byte.MAX_VALUE ? parsed - 256 : parsed;
             raw[i] = (byte)ret;
         }
         return new UUIDV7(raw);
+    }
+
+    public static UUIDV7 fromByteArray(final byte[] bs){
+        return new UUIDV7(bs);
     }
 
     public Instant createdAt() {
@@ -265,6 +269,13 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
 //        return ret;
     }
 
+    public UUID asUUID(){
+        ByteBuffer buff = ByteBuffer.wrap(raw);
+        long high = buff.getLong();
+        long low  = buff.getLong();
+        return new UUID(high, low);
+    }
+
     @Override
     public int hashCode() {
         return Arrays.hashCode(raw);
@@ -272,10 +283,8 @@ public class UUIDV7 implements Externalizable, Comparable<UUIDV7> {
 
     @Override
     public boolean equals(Object o) {
-        if (o instanceof UUIDV7)
-            return this == o || Arrays.equals(raw, ((UUIDV7) o).toByteArray());
-        else
-            return false;
+        return (o instanceof UUIDV7) &&
+                (this == o || Arrays.equals(raw, ((UUIDV7) o).toByteArray()));
     }
     @Override
     public String toString() {
